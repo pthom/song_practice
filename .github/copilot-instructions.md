@@ -1,7 +1,17 @@
 # Copilot Instructions for SongPractice
 
 ## Project Overview
-SongPractice is a cross-platform desktop application for singers to practice with audio tracks. Built using Dear ImGui Bundle for UI, targeting Windows/macOS/Linux with audio processing capabilities. Speed/pitch adjustment can be implemented as offline processing operations.
+SongPractice is a desktop tool for singers to practice over pre-recorded audio tracks (mp3, wav). The application provides:
+
+**Core Features:**
+- Visual waveform display with draggable playback cursor for precise navigation
+- Basic playback controls (play, pause, stop, seek, advance by 1/5/10 seconds)
+- Loop points for focused practice on difficult sections
+- Playback speed adjustment without pitch change for manageable tempo practice
+- Save/load practice sessions (loop points, speed settings)
+- Optional: Pitch adjustment and metronome features
+
+**Technical Stack:** Dear ImGui Bundle + RtAudio for cross-platform desktop deployment (Windows/macOS/Linux).
 
 ## Architecture Patterns
 
@@ -13,11 +23,11 @@ SongPractice is a cross-platform desktop application for singers to practice wit
 - **UI Layer**: ImGui immediate mode interface with custom audio-specific widgets
 
 ### Key Technical Requirements
-- Cross-platform audio backend using **RtAudio** (simplest multiplatform option)
-- Efficient waveform visualization for large audio files using ImGui custom drawing
-- Precise timing for loop points during playback
-- Non-blocking UI during tempo/pitch processing operations (show progress dialog)
-- Audio format support via **libsndfile** or **dr_libs** (header-only)
+- **Waveform Visualization**: Render large audio files efficiently using ImGui/ImPlot with zoom/scroll
+- **Precise Playback Control**: Sample-accurate seeking and loop points for practice sessions
+- **Offline Processing**: Speed/pitch adjustment as background operations with progress indication
+- **Session Persistence**: Auto-save practice settings per track to prevent data loss
+- **Cross-platform Audio**: RtAudio handles platform differences (ASIO/DirectSound/CoreAudio/ALSA)
 
 ## Development Conventions
 
@@ -65,11 +75,12 @@ src/
 - **Platform Testing**: RtAudio handles driver differences, but test file formats early
 - **Example CMake**: `find_package(imgui-bundle REQUIRED)` + `target_link_libraries(... imgui-bundle::imgui-bundle)`
 
-## Key User Workflows
-1. **Load Track**: Drag-drop or file browser → decode → generate waveform visualization
-2. **Set Loop**: Click/drag on waveform to set start/end points → visual feedback
-3. **Practice Session**: Adjust speed/pitch → loop playback → save settings automatically
-4. **Resume Practice**: Load previous session settings → continue where left off
+## Essential User Workflows
+1. **Track Loading**: File dialog or drag-drop → decode audio → generate waveform display with time markers
+2. **Navigation**: Click waveform to jump to position, drag cursor for scrubbing, use +/-1/5/10s buttons
+3. **Loop Setup**: Shift+click to set start point, Shift+click again for end → visual loop region highlight
+4. **Speed Practice**: Adjust tempo slider (50%-150%) → audio processes in background → loop playback at new speed
+5. **Session Management**: Settings auto-save on changes, restore previous loop/speed when reopening same track
 
 ## Testing Considerations  
 - Test with various audio formats and sample rates
