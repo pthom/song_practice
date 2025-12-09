@@ -82,7 +82,10 @@ This document outlines the development strategy for SongPractice, broken down in
 10. **Polish & Testing**
     - Add error handling for unsupported formats
     - Test cross-platform compatibility
-    - Improve UI responsiveness, add keyboard shortcuts for common actions
+    - Implement keyboard shortcuts:
+      - Space bar for play/pause toggle
+      - Left/Right arrow keys for marker navigation (previous/next marker)
+    - Improve UI responsiveness and user experience
 
 ## Task Dependencies
 

@@ -216,6 +216,9 @@ void MainWindow::showGui()
     if (m_audioEngine.hasAudio() && m_waveformDirty)
         updateWaveformData();
 
+    // Handle keyboard shortcuts
+    handleKeyboardShortcuts();
+
     renderWaveformArea();
     renderAudioInfo();
     renderAudioControls();
@@ -315,7 +318,8 @@ void MainWindow::renderAudioControls()
     ImGui::SameLine();
     const bool isPlaying = m_audioEngine.isPlaying();
     const char* playIcon = isPlaying ? ICON_FA_PAUSE : ICON_FA_PLAY;
-    if (showControlButton(playIcon, isPlaying ? "Pause" : "Play"))
+    const char* playTooltip = isPlaying ? "Pause (Space)" : "Play (Space)";
+    if (showControlButton(playIcon, playTooltip))
     {
         if (isPlaying)
             m_audioEngine.pause();
@@ -451,10 +455,10 @@ void MainWindow::renderMarkerControls()
     const bool hasMarkers = !m_appState.markers.empty();
     if (!hasMarkers)
         ImGui::BeginDisabled();
-    if (showControlButton(ICON_FA_BACKWARD_STEP, "seek to Previous Marker"))
+    if (showControlButton(ICON_FA_BACKWARD_STEP, "Previous Marker (Left Arrow)"))
         seekToPreviousMarker();
     ImGui::SameLine();
-    if (showControlButton(ICON_FA_FORWARD_STEP, "seek to Next Marker"))
+    if (showControlButton(ICON_FA_FORWARD_STEP, "Next Marker (Right Arrow)"))
         seekToNextMarker();
     if (!hasMarkers)
         ImGui::EndDisabled();
@@ -470,15 +474,15 @@ void MainWindow::renderMarkerControls()
     }
 
 
-    ImGui::BeginChild("Markers", HelloImGui::EmToVec2(0, 20));
+    ImGui::BeginChild("Markers"); // HelloImGui::EmToVec2(0, 20));
     int markerToDelete = -1;
     for (int i = 0; i < m_appState.markers.size(); ++i)
     {
         ImGui::PushID(i);
         Marker& marker = m_appState.markers[i];
-        ImGui::SetNextItemWidth(HelloImGui::EmSize(15.f));
+        ImGui::SetNextItemWidth(HelloImGui::EmSize(5.f));
         ImGui::InputText("Name", &marker.name);
-        ImGui::SameLine(HelloImGui::EmSize(25.f));
+        ImGui::SameLine(HelloImGui::EmSize(10.f));
         if (ImGui::Button("Delete Marker"))
             markerToDelete = i;
         ImGui::PopID();
@@ -588,4 +592,47 @@ void MainWindow::sortMarkers()
     std::sort(m_appState.markers.begin(), m_appState.markers.end(), [](const Marker& a, const Marker& b) {
         return a.timeSeconds < b.timeSeconds;
     });
+}
+
+void MainWindow::handleKeyboardShortcuts()
+{
+    // Only handle shortcuts when no text input is active
+    if (ImGui::GetIO().WantTextInput)
+        return;
+
+    // Space bar for play/pause toggle
+    if (ImGui::IsKeyPressed(ImGuiKey_Space, false))
+    {
+        if (m_audioEngine.hasAudio())
+        {
+            if (m_audioEngine.isPlaying())
+            {
+                m_audioEngine.pause();
+            }
+            else
+            {
+                // Rewind to start if at the end
+                if (m_audioEngine.getCurrentTime() >= m_audioEngine.getDuration())
+                    m_audioEngine.seek(0.0f);
+                m_audioEngine.play();
+            }
+        }
+    }
+
+    // Arrow keys for marker navigation
+    if (ImGui::IsKeyPressed(ImGuiKey_LeftArrow, false))
+    {
+        if (m_audioEngine.hasAudio())
+        {
+            seekToPreviousMarker();
+        }
+    }
+
+    if (ImGui::IsKeyPressed(ImGuiKey_RightArrow, false))
+    {
+        if (m_audioEngine.hasAudio())
+        {
+            seekToNextMarker();
+        }
+    }
 }

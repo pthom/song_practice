@@ -50,6 +50,7 @@ private:
     void renderMarkerControls();
     void renderWaveformArea();
     void updateWaveformData();
+    void handleKeyboardShortcuts();
     int currentMarkerIndex() const;
     void sortMarkers();
 
