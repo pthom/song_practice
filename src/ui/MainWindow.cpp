@@ -215,6 +215,7 @@ void MainWindow::showGui()
     renderWaveformArea();
     renderAudioInfo();
     renderAudioControls();
+    renderTempoControls();
     renderMarkerControls();
 
     m_appState.playPosition = m_audioEngine.getCurrentTime();
@@ -342,6 +343,35 @@ void MainWindow::renderAudioControls()
                 Utils::formatTime(m_audioEngine.getCurrentTime()).c_str(),
                 Utils::formatTime(m_audioEngine.getDuration()).c_str());
     ImGui::PopStyleColor();
+}
+
+void MainWindow::renderTempoControls()
+{
+    ImGui::Spacing();
+    ImGui::Text("Tempo Controls:");
+
+    const bool hasAudio = m_audioEngine.hasAudio();
+
+    if (!hasAudio)
+        ImGui::BeginDisabled();
+
+    // Tempo slider with percentage display
+    float tempoPercent = m_appState.tempoMultiplier * 100.0f;
+    if (ImGui::SliderFloat("Tempo", &tempoPercent, 50.0f, 150.0f, "%.0f%%"))
+    {
+        m_appState.tempoMultiplier = tempoPercent / 100.0f;
+        // TODO: Update audio engine tempo when we implement the audio processing
+    }
+
+    // Reset button
+    ImGui::SameLine();
+    if (ImGui::Button("Reset"))
+    {
+        m_appState.tempoMultiplier = 1.0f;
+    }
+
+    if (!hasAudio)
+        ImGui::EndDisabled();
 }
 
 void MainWindow::seekToPreviousMarker()

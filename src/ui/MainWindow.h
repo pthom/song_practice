@@ -16,6 +16,7 @@ struct ApplicationState
     std::vector<Marker> markers;
     std::string soundFilePath;
     float playPosition = 0.0f;
+    float tempoMultiplier = 1.0f;  // 1.0 = normal speed, 0.5 = half speed, 2.0 = double speed
 };
 
 class MainWindow
@@ -45,16 +46,16 @@ public:
 private:
 
     void renderAudioControls();
-
-    void seekToPreviousMarker();
-
-    void seekToNextMarker();
-
+    void renderTempoControls();
     void renderMarkerControls();
     void renderWaveformArea();
     void updateWaveformData();
     int currentMarkerIndex() const;
     void sortMarkers();
+
+    void seekToPreviousMarker();
+
+    void seekToNextMarker();
 
     // Application state
     AudioEngine m_audioEngine;

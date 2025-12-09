@@ -6,6 +6,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
+set(BUILD_SHARED_LIBS OFF)
+
 # Find Dear ImGui Bundle
 FetchContent_Declare(
     imgui_bundle 
@@ -37,6 +39,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
+# SoundTouch library for tempo adjustment
+FetchContent_Declare(
+    soundtouch
+    GIT_REPOSITORY https://codeberg.org/soundtouch/soundtouch.git
+    GIT_TAG 2.4.0
+)
+FetchContent_MakeAvailable(soundtouch)
+
 # Source files
 set(SOURCES
     src/main.cpp
@@ -60,6 +70,7 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE 
     rtaudio
     nlohmann_json::nlohmann_json
+    SoundTouch
 )
 
 # Include directories

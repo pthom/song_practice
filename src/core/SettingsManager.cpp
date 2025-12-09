@@ -92,6 +92,12 @@ bool SettingsManager::loadSettingsFromFile(const std::string& filePath, Applicat
             state.playPosition = j["playPosition"].get<float>();
         }
 
+        // Load tempoMultiplier
+        if (j.contains("tempoMultiplier") && j["tempoMultiplier"].is_number())
+        {
+            state.tempoMultiplier = j["tempoMultiplier"].get<float>();
+        }
+
         // Load markers
         if (j.contains("markers") && j["markers"].is_array())
         {
@@ -131,6 +137,9 @@ bool SettingsManager::saveSettingsToFile(const std::string& filePath, const Appl
 
         // Save playPosition
         j["playPosition"] = state.playPosition;
+
+        // Save tempoMultiplier
+        j["tempoMultiplier"] = state.tempoMultiplier;
 
         // Save markers
         json markersJson = json::array();

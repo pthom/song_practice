@@ -62,16 +62,22 @@ This document outlines the development strategy for SongPractice, broken down in
    - Add per-track settings functionality with manual load/save via menu items:
      - "Load Track Settings..." menu item that opens a file dialog to select a .songpractice.json file
      - "Save Track Settings..." menu item that opens a file dialog to save current markers and settings
-     - Per-track settings include: markers, play position, and associated audio file path
+     - Per-track settings include: markers, play position, tempo adjustment, and associated audio file path
      - Use portable-file-dialogs (pfd) for cross-platform file selection
      - Settings files use .songpractice.json extension for easy identification
 
 ### Phase 4: Advanced Features (Tasks 9-10)
 **Goal**: Add tempo control and polish the application
 
-9. **Speed Adjustment (Offline)**
-   - Integrate SoundTouch library for tempo adjustment without pitch change
-   - Implement background processing with progress dialog for 50%-150% speed range
+9. **Speed Adjustment (Real-time)**
+   - Integrate SoundTouch library for high-quality tempo adjustment without pitch change
+   - Implement real-time processing with sliding window approach for immediate feedback
+   - Create separate audio processing thread to maintain UI responsiveness and prevent audio dropouts
+   - Add tempo slider UI control with range 50%-150% (0.5x to 1.5x speed)
+   - Integrate tempo setting into ApplicationState for persistence across sessions
+   - Handle tempo changes during playback with smooth transitions
+   - Optimize buffering strategy to balance latency and audio quality
+   - Add visual tempo indicator in the transport controls area
 
 10. **Polish & Testing**
     - Add error handling for unsupported formats
