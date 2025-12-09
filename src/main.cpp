@@ -24,8 +24,9 @@ int main(int argc, char **argv)
     runnerParams.imGuiWindowParams.showMenuBar = true;
     runnerParams.imGuiWindowParams.showStatusBar = true;
     runnerParams.imGuiWindowParams.menuAppTitle = "SongPractice";
-    
     // Setup callbacks using HelloImGui utilities
+    runnerParams.callbacks.defaultIconFont = HelloImGui::DefaultIconFont::FontAwesome6;
+
     runnerParams.callbacks.ShowGui = [&mainWindow]() {
         mainWindow.showGui();
     };

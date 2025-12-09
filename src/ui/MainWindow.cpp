@@ -4,6 +4,8 @@
 #include "hello_imgui/hello_imgui.h"
 #include "core/Utils.h"
 #include "portable_file_dialogs/portable_file_dialogs.h"
+#include "hello_imgui/icons_font_awesome_6.h"
+
 
 MainWindow::MainWindow()
 {
@@ -120,21 +122,23 @@ void MainWindow::renderAudioControls()
     const bool hasAudio = m_audioEngine.hasAudio();
     
     if (!hasAudio) ImGui::BeginDisabled();
-    
-    if (ImGui::Button("Play"))
+
+    ImGui::PushFont(nullptr, 24.0f); // Use a larger font for icons
+    if (ImGui::Button(ICON_FA_PLAY))
     {
         m_audioEngine.play();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Pause"))
+    if (ImGui::Button(ICON_FA_PAUSE))
     {
         m_audioEngine.pause();
     }
     ImGui::SameLine();
-    if (ImGui::Button("Stop"))
+    if (ImGui::Button(ICON_FA_STOP))
     {
         m_audioEngine.stop();
     }
+    ImGui::PopFont();
     
     if (!hasAudio) ImGui::EndDisabled();
     
