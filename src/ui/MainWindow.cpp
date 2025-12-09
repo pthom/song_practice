@@ -23,10 +23,13 @@ void MainWindow::showGui()
         ImGui::Text("SongPractice - Audio Practice Tool");
         ImGui::Separator();
         
-        if (!m_currentFile.empty())
+        if (m_audioEngine.hasAudio())
         {
-            ImGui::Text("Current file: %s", Utils::getFileName(m_currentFile).c_str());
+            const std::string fileName = Utils::getFileName(m_audioEngine.loadedFilePath());
+            ImGui::Text("Current file: %s", fileName.c_str());
             ImGui::Text("Duration: %s", Utils::formatTime(m_audioEngine.getDuration()).c_str());
+            ImGui::Text("Sample rate: %u Hz", m_audioEngine.getSampleRate());
+            ImGui::Text("Channels: %u", m_audioEngine.getChannelCount());
         }
         else
         {
@@ -48,7 +51,9 @@ void MainWindow::showGui()
 
 void MainWindow::showMenus()
 {
-    auto & runnerParams = *HelloImGui::GetRunnerParams();
+    auto& runnerParams = *HelloImGui::GetRunnerParams();
+    HelloImGui::ShowAppMenu(runnerParams);
+    HelloImGui::ShowViewMenu(runnerParams);
     
     // Add our custom File menu
     if (ImGui::BeginMenu("File"))
@@ -83,9 +88,17 @@ void MainWindow::openAudioFile()
         std::string filePath = selection[0];
         if (Utils::isAudioFile(filePath))
         {
+            const std::string extension = Utils::getFileExtension(filePath);
+            if (extension != "wav" && extension != "mp3")
+            {
+                HelloImGui::Log(HelloImGui::LogLevel::Warning,
+                                "Currently supported formats: wav, mp3 (got: %s)",
+                                extension.c_str());
+                return;
+            }
+
             if (m_audioEngine.loadAudioFile(filePath.c_str()))
             {
-                m_currentFile = filePath;
                 HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded audio file: %s", 
                               Utils::getFileName(filePath).c_str());
             }
@@ -108,7 +121,7 @@ void MainWindow::renderAudioControls()
     ImGui::Spacing();
     ImGui::Text("Audio Controls:");
     
-    bool hasAudio = !m_currentFile.empty();
+    const bool hasAudio = m_audioEngine.hasAudio();
     
     if (!hasAudio) ImGui::BeginDisabled();
     
@@ -145,11 +158,16 @@ void MainWindow::renderWaveformArea()
     ImGui::Text("Waveform Display:");
     ImGui::BeginChild("Waveform", ImVec2(0, 200), true);
     
-    if (!m_currentFile.empty())
+    if (m_audioEngine.hasAudio())
     {
+        const std::string filePath = m_audioEngine.loadedFilePath();
+        const std::string fileName = Utils::getFileName(filePath);
         ImGui::Text("Waveform visualization will appear here");
-        ImGui::Text("File: %s", Utils::getFileName(m_currentFile).c_str());
-        ImGui::Text("Format: %s", Utils::getFileExtension(m_currentFile).c_str());
+        ImGui::Text("File: %s", fileName.c_str());
+        ImGui::Text("Format: %s", Utils::getFileExtension(filePath).c_str());
+        ImGui::Text("Samples: %zu (frames: %llu)",
+                    m_audioEngine.getAudioData().size(),
+                    static_cast<unsigned long long>(m_audioEngine.getFrameCount()));
     }
     else
     {
@@ -176,10 +194,10 @@ void MainWindow::showStatus()
     ImGui::Text(" | ");
     ImGui::SameLine();
     
-    if (!m_currentFile.empty())
+    if (m_audioEngine.hasAudio())
     {
-        ImGui::Text("%s - %s", 
-                   Utils::getFileName(m_currentFile).c_str(),
+        ImGui::Text("%s - %s",
+                   Utils::getFileName(m_audioEngine.loadedFilePath()).c_str(),
                    Utils::formatTime(m_audioEngine.getCurrentTime()).c_str());
     }
     else

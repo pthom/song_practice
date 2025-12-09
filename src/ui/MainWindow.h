@@ -22,7 +22,6 @@ private:
     
     // Application state
     AudioEngine m_audioEngine;
-    std::string m_currentFile;
     bool m_showDemo = false;
     bool m_showMetrics = false;
 };

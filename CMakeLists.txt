@@ -21,6 +21,17 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(rtaudio)
 
+# Header-only audio decoding utilities (dr_wav, dr_mp3)
+FetchContent_Declare(
+    dr_libs
+    GIT_REPOSITORY https://github.com/mackron/dr_libs.git
+    GIT_TAG master
+)
+FetchContent_GetProperties(dr_libs)
+if(NOT dr_libs_POPULATED)
+    FetchContent_Populate(dr_libs)
+endif()
+
 # Source files
 set(SOURCES
     src/main.cpp
@@ -46,4 +57,5 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE 
     src
     external
+    ${dr_libs_SOURCE_DIR}
 )
