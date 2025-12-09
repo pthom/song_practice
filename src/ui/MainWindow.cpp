@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 #include "imgui.h"
+#include "implot/implot.h"
 #include "hello_imgui/hello_imgui.h"
 #include "core/Utils.h"
 #include "portable_file_dialogs/portable_file_dialogs.h"
@@ -26,6 +27,10 @@ void MainWindow::showGui()
         ImGui::Text("Duration: %s", Utils::formatTime(m_audioEngine.getDuration()).c_str());
         ImGui::Text("Sample rate: %u Hz", m_audioEngine.getSampleRate());
         ImGui::Text("Channels: %u", m_audioEngine.getChannelCount());
+        if (m_waveformDirty)
+        {
+            updateWaveformData();
+        }
     }
     else
     {
@@ -89,7 +94,8 @@ void MainWindow::openAudioFile()
 
             if (m_audioEngine.loadAudioFile(filePath.c_str()))
             {
-                HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded audio file: %s", 
+                m_waveformDirty = true;
+                HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded audio file: %s",
                               Utils::getFileName(filePath).c_str());
             }
             else
@@ -146,25 +152,34 @@ void MainWindow::renderWaveformArea()
 {
     ImGui::Spacing();
     ImGui::Text("Waveform Display:");
-    ImGui::BeginChild("Waveform", ImVec2(0, 200), true);
-    
-    if (m_audioEngine.hasAudio())
+    ImGui::BeginChild("Waveform", ImVec2(0, 300), true);
+
+    if (m_audioEngine.hasAudio() && m_waveformRenderer.hasWaveform())
     {
-        const std::string filePath = m_audioEngine.loadedFilePath();
-        const std::string fileName = Utils::getFileName(filePath);
-        ImGui::Text("Waveform visualization will appear here");
-        ImGui::Text("File: %s", fileName.c_str());
-        ImGui::Text("Format: %s", Utils::getFileExtension(filePath).c_str());
-        ImGui::Text("Samples: %zu (frames: %llu)",
-                    m_audioEngine.getAudioData().size(),
-                    static_cast<unsigned long long>(m_audioEngine.getFrameCount()));
+        ImPlot::SetNextAxesLimits(0.0, m_audioEngine.getDuration(), -1.0, 1.0, ImGuiCond_Once);
+        m_waveformRenderer.draw("WaveformPlot", ImVec2(-1, -1), m_audioEngine.getCurrentTime());
     }
     else
     {
         ImGui::TextDisabled("Load an audio file to see waveform");
     }
-    
+
     ImGui::EndChild();
+}
+
+void MainWindow::updateWaveformData()
+{
+    if (m_audioEngine.hasAudio())
+    {
+        m_waveformRenderer.setWaveform(m_audioEngine.getAudioData(),
+                                       m_audioEngine.getChannelCount(),
+                                       m_audioEngine.getSampleRate());
+    }
+    else
+    {
+        m_waveformRenderer.clear();
+    }
+    m_waveformDirty = false;
 }
 
 void MainWindow::showStatus()

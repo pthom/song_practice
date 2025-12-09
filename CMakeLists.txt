@@ -34,6 +34,8 @@ set(SOURCES
     src/main.cpp
     src/ui/MainWindow.cpp
     src/ui/MainWindow.h
+    src/ui/WaveformRenderer.cpp
+    src/ui/WaveformRenderer.h
     src/audio/AudioEngine.cpp
     src/audio/AudioEngine.h
     src/core/Utils.cpp

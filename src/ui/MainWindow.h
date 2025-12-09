@@ -1,5 +1,6 @@
 #pragma once
 #include "audio/AudioEngine.h"
+#include "ui/WaveformRenderer.h"
 #include <string>
 
 class MainWindow
@@ -19,9 +20,12 @@ public:
 private:
     void renderAudioControls();
     void renderWaveformArea();
-    
+    void updateWaveformData();
+
     // Application state
     AudioEngine m_audioEngine;
+    WaveformRenderer m_waveformRenderer;
+    bool m_waveformDirty = false;
     bool m_showDemo = false;
     bool m_showMetrics = false;
 };
