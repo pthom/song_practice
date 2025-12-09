@@ -10,7 +10,6 @@ struct MarkerView
 {
     std::string label;
     float timeSeconds = 0.0f;
-    bool isCurrent = false;
 };
 
 class WaveformRenderer

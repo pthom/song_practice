@@ -26,38 +26,37 @@ MainWindow::~MainWindow()
     m_audioEngine.shutdown();
 }
 
-void MainWindow::showGui()
+void MainWindow::renderAudioInfo()
 {
-    ImGui::Text("SongPractice - Audio Practice Tool");
-    ImGui::Separator();
-
     if (m_audioEngine.hasAudio())
     {
         const std::string fileName = Utils::getFileName(m_audioEngine.loadedFilePath());
-        ImGui::Text("Current file: %s", fileName.c_str());
-        ImGui::Text("Duration: %s", Utils::formatTime(m_audioEngine.getDuration()).c_str());
-        ImGui::Text("Sample rate: %u Hz", m_audioEngine.getSampleRate());
-        ImGui::Text("Channels: %u", m_audioEngine.getChannelCount());
-        if (m_waveformDirty)
-        {
-            updateWaveformData();
-        }
+        ImGui::Text("Duration: %s, Sample rate: %u Hz, Channels: %u (%s)",
+                    Utils::formatTime(m_audioEngine.getDuration()).c_str(),
+                    m_audioEngine.getSampleRate(),
+                    m_audioEngine.getChannelCount(),
+                    fileName.c_str());
     }
     else
     {
         ImGui::Text("No audio file loaded");
         ImGui::Text("Use File -> Open Audio File to load a track for practice.");
     }
+}
 
+void MainWindow::showGui()
+{
+    ImGui::Text("SongPractice - Audio Practice Tool");
+    ImGui::Separator();
+
+    if (m_audioEngine.hasAudio() && m_waveformDirty)
+        updateWaveformData();
+
+    renderWaveformArea();
+    renderAudioInfo();
     renderAudioControls();
     renderMarkerControls();
-    renderWaveformArea();
 
-    // Show debug windows if requested
-    if (m_showDemo)
-        ImGui::ShowDemoWindow(&m_showDemo);
-    if (m_showMetrics)
-        ImGui::ShowMetricsWindow(&m_showMetrics);
 }
 
 void MainWindow::showMenus()
@@ -71,25 +70,17 @@ void MainWindow::showMenus()
         }
         ImGui::EndMenu();
     }
-    
-    // Add custom View menu items
-    if (ImGui::BeginMenu("View"))
-    {
-        ImGui::MenuItem("Demo Window", nullptr, &m_showDemo);
-        ImGui::MenuItem("Metrics Window", nullptr, &m_showMetrics);
-        ImGui::EndMenu();
-    }
 }
 
 void MainWindow::openAudioFile()
 {
     // Use portable-file-dialogs for file selection
-    auto selection = pfd::open_file("Select Audio File", 
+    auto selection = pfd::open_file("Select Audio File",
                                    "",
                                    {"Audio Files", "*.wav *.mp3 *.flac *.ogg *.m4a *.aac",
                                     "All Files", "*"},
                                    pfd::opt::none).result();
-    
+
     if (!selection.empty())
     {
         std::string filePath = selection[0];
@@ -112,13 +103,13 @@ void MainWindow::openAudioFile()
             }
             else
             {
-                HelloImGui::Log(HelloImGui::LogLevel::Error, "Failed to load audio file: %s", 
+                HelloImGui::Log(HelloImGui::LogLevel::Error, "Failed to load audio file: %s",
                               Utils::getFileName(filePath).c_str());
             }
         }
         else
         {
-            HelloImGui::Log(HelloImGui::LogLevel::Warning, "Unsupported file format: %s", 
+            HelloImGui::Log(HelloImGui::LogLevel::Warning, "Unsupported file format: %s",
                           Utils::getFileName(filePath).c_str());
         }
     }
@@ -193,6 +184,20 @@ void MainWindow::renderAudioControls()
     ImGui::PopStyleColor();
 }
 
+void MainWindow::seekToPreviousMarker()
+{
+    const int idx = currentMarkerIndex();
+    if (idx > 0)
+        m_audioEngine.seek(m_appState.markers[idx - 1].timeSeconds);
+}
+
+void MainWindow::seekToNextMarker()
+{
+    const int idx = currentMarkerIndex();
+    if (idx >= 0 && idx + 1 < static_cast<int>(m_appState.markers.size()))
+        m_audioEngine.seek(m_appState.markers[idx + 1].timeSeconds);
+}
+
 void MainWindow::renderMarkerControls()
 {
     if (!m_audioEngine.hasAudio())
@@ -207,51 +212,37 @@ void MainWindow::renderMarkerControls()
         Marker marker;
         marker.timeSeconds = m_audioEngine.getCurrentTime();
         marker.name = "Marker " + Utils::formatTime(marker.timeSeconds);
-        m_markers.push_back(marker);
+        m_appState.markers.push_back(marker);
         sortMarkers();
     }
     ImGui::SameLine();
-    const bool hasMarkers = !m_markers.empty();
+    const bool hasMarkers = !m_appState.markers.empty();
     if (!hasMarkers)
         ImGui::BeginDisabled();
     if (ImGui::Button("Previous Marker"))
-    {
-        const int idx = currentMarkerIndex();
-        if (idx > 0)
-            m_audioEngine.seek(m_markers[idx - 1].timeSeconds);
-    }
+        seekToPreviousMarker();
     ImGui::SameLine();
     if (ImGui::Button("Next Marker"))
-    {
-        const int idx = currentMarkerIndex();
-        if (idx >= 0 && idx + 1 < static_cast<int>(m_markers.size()))
-            m_audioEngine.seek(m_markers[idx + 1].timeSeconds);
-    }
+        seekToNextMarker();
     if (!hasMarkers)
         ImGui::EndDisabled();
 
-    const int currentIdx = currentMarkerIndex();
-    if (currentIdx >= 0)
+    ImGui::BeginChild("Markers", HelloImGui::EmToVec2(0, 20));
+    int markerToDelete = -1;
+    for (int i = 0; i < m_appState.markers.size(); ++i)
     {
-        ImGui::Separator();
-        Marker& marker = m_markers[currentIdx];
+        ImGui::PushID(i);
+        Marker& marker = m_appState.markers[i];
+        ImGui::SetNextItemWidth(HelloImGui::EmSize(15.f));
         ImGui::InputText("Name", &marker.name);
-        float newTime = marker.timeSeconds;
-        if (ImGui::DragFloat("Position (s)", &newTime, 0.1f, 0.0f, m_audioEngine.getDuration()))
-        {
-            marker.timeSeconds = std::clamp(newTime, 0.0f, m_audioEngine.getDuration());
-            sortMarkers();
-        }
+        ImGui::SameLine(HelloImGui::EmSize(25.f));
         if (ImGui::Button("Delete Marker"))
-        {
-            m_markers.erase(m_markers.begin() + currentIdx);
-        }
+            markerToDelete = i;
+        ImGui::PopID();
     }
-    else if (hasMarkers)
-    {
-        ImGui::Separator();
-        ImGui::TextDisabled("Move playhead near a marker to edit it.");
-    }
+    ImGui::EndChild();
+    if (markerToDelete >= 0)
+        m_appState.markers.erase(m_appState.markers.begin() + markerToDelete);
 }
 
 void MainWindow::renderWaveformArea()
@@ -265,14 +256,12 @@ void MainWindow::renderWaveformArea()
         ImPlot::SetNextAxesLimits(0.0, m_audioEngine.getDuration(), -1.0, 1.0, ImGuiCond_Once);
         float seekTime = 0.0f;
         std::vector<MarkerView> markerViews;
-        markerViews.reserve(m_markers.size());
-        const int currentIdx = currentMarkerIndex();
-        for (int i = 0; i < static_cast<int>(m_markers.size()); ++i)
+        markerViews.reserve(m_appState.markers.size());
+        for (int i = 0; i < static_cast<int>(m_appState.markers.size()); ++i)
         {
             MarkerView mv;
-            mv.label = m_markers[i].name;
-            mv.timeSeconds = m_markers[i].timeSeconds;
-            mv.isCurrent = (i == currentIdx);
+            mv.label = m_appState.markers[i].name;
+            mv.timeSeconds = m_appState.markers[i].timeSeconds;
             markerViews.push_back(std::move(mv));
         }
 
@@ -341,9 +330,9 @@ int MainWindow::currentMarkerIndex() const
 {
     const float currentTime = m_audioEngine.getCurrentTime();
     int idx = -1;
-    for (int i = 0; i < static_cast<int>(m_markers.size()); ++i)
+    for (int i = 0; i < static_cast<int>(m_appState.markers.size()); ++i)
     {
-        if (m_markers[i].timeSeconds <= currentTime)
+        if (m_appState.markers[i].timeSeconds <= currentTime)
             idx = i;
         else
             break;
@@ -353,7 +342,7 @@ int MainWindow::currentMarkerIndex() const
 
 void MainWindow::sortMarkers()
 {
-    std::sort(m_markers.begin(), m_markers.end(), [](const Marker& a, const Marker& b) {
+    std::sort(m_appState.markers.begin(), m_appState.markers.end(), [](const Marker& a, const Marker& b) {
         return a.timeSeconds < b.timeSeconds;
     });
 }
