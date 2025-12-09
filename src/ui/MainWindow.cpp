@@ -16,6 +16,23 @@ namespace
 }
 
 
+bool showControlButton(const char* icon, const char* tooltip, bool autorepeat = false)
+{
+    bool pressed = false;
+    ImGui::PushID(icon);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.8f, 0.8f, 0.35f));
+    if (autorepeat)
+        ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
+    pressed = ImGui::Button(icon, kTransportButtonSize);
+    if (autorepeat)
+        ImGui::PopItemFlag();
+    if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal) && tooltip)
+        ImGui::SetTooltip("%s", tooltip);
+    ImGui::PopStyleColor();
+    ImGui::PopID();
+    return pressed;
+}
+
 MainWindow::MainWindow()
 {
     m_audioEngine.initialize();
@@ -169,43 +186,28 @@ void MainWindow::renderAudioControls()
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(kTransportSpacing, 10.0f));
 
-    auto transportButton = [](const char* icon, const char* tooltip, bool autorepeat = false) -> bool{
-        bool pressed = false;
-        ImGui::PushID(icon);
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.8f, 0.8f, 0.35f));
-        if (autorepeat)
-            ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
-        pressed = ImGui::Button(icon, kTransportButtonSize);
-        if (autorepeat)
-            ImGui::PopItemFlag();
-        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal) && tooltip)
-            ImGui::SetTooltip("%s", tooltip);
-        ImGui::PopStyleColor();
-        ImGui::PopID();
-        return pressed;
-    };
-
-    if (transportButton(ICON_FA_BACKWARD, "Rewind 1 second", true))
+    if (showControlButton(ICON_FA_BACKWARD, "Rewind 1 second", true))
         m_audioEngine.seekBy(-kSeekStep);
 
     ImGui::SameLine();
     const bool isPlaying = m_audioEngine.isPlaying();
     const char* playIcon = isPlaying ? ICON_FA_PAUSE : ICON_FA_PLAY;
-    if (transportButton(playIcon, isPlaying ? "Pause" : "Play"))
+    if (showControlButton(playIcon, isPlaying ? "Pause" : "Play"))
     {
         if (isPlaying)
             m_audioEngine.pause();
         else
+        {
+            // rewind to start if at the end
+            if (m_audioEngine.getCurrentTime() >= m_audioEngine.getDuration())
+                m_audioEngine.seek(0.0f);
             m_audioEngine.play();
+        }
     }
 
     ImGui::SameLine();
-    if (transportButton(ICON_FA_STOP, "Stop"))
-        m_audioEngine.stop();
 
-    ImGui::SameLine();
-
-    if (transportButton(ICON_FA_FORWARD, "Forward 1 second", true))
+    if (showControlButton(ICON_FA_FORWARD, "Forward 1 second", true))
         m_audioEngine.seekBy(kSeekStep);
 
     ImGui::PopStyleVar();
@@ -228,16 +230,60 @@ void MainWindow::renderAudioControls()
 
 void MainWindow::seekToPreviousMarker()
 {
+    if (m_appState.markers.empty())
+    {
+        m_audioEngine.seek(0.0f);
+        return;
+    }
+
+    const float currentTime = m_audioEngine.getCurrentTime();
     const int idx = currentMarkerIndex();
-    if (idx > 0)
-        m_audioEngine.seek(m_appState.markers[idx - 1].timeSeconds);
+
+    if (idx >= 0)
+    {
+        const float distanceToCurrentMarker = currentTime - m_appState.markers[idx].timeSeconds;
+
+        if (distanceToCurrentMarker > 1.f)
+        {
+            // Head is far from current marker, seek to current marker
+            m_audioEngine.seek(m_appState.markers[idx].timeSeconds);
+        }
+        else if (idx > 0)
+        {
+            // Head is close to current marker, seek to previous marker
+            m_audioEngine.seek(m_appState.markers[idx - 1].timeSeconds);
+        }
+        else
+        {
+            // No previous marker, seek to start
+            m_audioEngine.seek(0.0f);
+        }
+    }
+    else
+    {
+        // No marker before current position, seek to start
+        m_audioEngine.seek(0.0f);
+    }
 }
 
 void MainWindow::seekToNextMarker()
 {
+    if (m_appState.markers.empty())
+        return;
+
     const int idx = currentMarkerIndex();
-    if (idx >= 0 && idx + 1 < static_cast<int>(m_appState.markers.size()))
-        m_audioEngine.seek(m_appState.markers[idx + 1].timeSeconds);
+    const int nextIdx = idx + 1;
+
+    if (nextIdx < static_cast<int>(m_appState.markers.size()))
+    {
+        // Seek to next marker
+        m_audioEngine.seek(m_appState.markers[nextIdx].timeSeconds);
+    }
+    else
+    {
+        // seek to end
+        m_audioEngine.seek(m_audioEngine.getDuration());
+    }
 }
 
 void MainWindow::renderMarkerControls()
@@ -249,25 +295,27 @@ void MainWindow::renderMarkerControls()
     ImGui::Separator();
     ImGui::Text("Markers:");
 
-    if (ImGui::Button("Add Marker"))
-    {
-        Marker marker;
-        marker.timeSeconds = m_audioEngine.getCurrentTime();
-        marker.name = "Marker " + Utils::formatTime(marker.timeSeconds);
-        m_appState.markers.push_back(marker);
-        sortMarkers();
-    }
-    ImGui::SameLine();
     const bool hasMarkers = !m_appState.markers.empty();
     if (!hasMarkers)
         ImGui::BeginDisabled();
-    if (ImGui::Button("Previous Marker"))
+    if (showControlButton(ICON_FA_BACKWARD_STEP, "seek to Previous Marker"))
         seekToPreviousMarker();
     ImGui::SameLine();
-    if (ImGui::Button("Next Marker"))
+    if (showControlButton(ICON_FA_FORWARD_STEP, "seek to Next Marker"))
         seekToNextMarker();
     if (!hasMarkers)
         ImGui::EndDisabled();
+
+    ImGui::SameLine();
+    if (showControlButton(ICON_FA_PLUS, "Add Marker"))
+    {
+        Marker marker;
+        marker.timeSeconds = m_audioEngine.getCurrentTime();
+        marker.name = Utils::formatTime(marker.timeSeconds);
+        m_appState.markers.push_back(marker);
+        sortMarkers();
+    }
+
 
     ImGui::BeginChild("Markers", HelloImGui::EmToVec2(0, 20));
     int markerToDelete = -1;
