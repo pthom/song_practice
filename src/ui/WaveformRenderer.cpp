@@ -60,8 +60,14 @@ bool WaveformRenderer::draw(const char* plotId,
     bool dragged = false;
 
     ImPlot::PushStyleVar(ImPlotStyleVar_PlotPadding, ImVec2(10.0f, 6.0f));
-    if (ImPlot::BeginPlot(plotId, size, ImPlotFlags_CanvasOnly | ImPlotFlags_NoMenus))
+    const ImPlotFlags plotFlags = ImPlotFlags_CanvasOnly | ImPlotFlags_NoMenus;
+    if (ImPlot::BeginPlot(plotId, size, plotFlags))
     {
+        ImPlotAxisFlags axisFlags = ImPlotAxisFlags_NoHighlight | ImPlotAxisFlags_Lock;
+        ImPlot::SetupAxisLimits(ImAxis_X1, 0.0, m_durationSeconds, ImGuiCond_Always);
+        ImPlot::SetupAxisLimits(ImAxis_Y1, -1.0, 1.0, ImGuiCond_Always);
+        ImPlot::SetupAxes(nullptr, nullptr, axisFlags, axisFlags);
+
         const ImPlotRect limits = ImPlot::GetPlotLimits();
         const float visibleDuration = static_cast<float>(limits.X.Max - limits.X.Min);
         const float plotPixelWidth = ImGui::GetWindowDrawList()->GetClipRectMax().x - ImGui::GetWindowDrawList()->GetClipRectMin().x;
