@@ -51,10 +51,6 @@ void MainWindow::showGui()
 
 void MainWindow::showMenus()
 {
-    auto& runnerParams = *HelloImGui::GetRunnerParams();
-    HelloImGui::ShowAppMenu(runnerParams);
-    HelloImGui::ShowViewMenu(runnerParams);
-    
     // Add our custom File menu
     if (ImGui::BeginMenu("File"))
     {

@@ -29,6 +29,8 @@ int main(int argc, char **argv)
     runnerParams.callbacks.ShowGui = [&mainWindow]() {
         mainWindow.showGui();
     };
+    runnerParams.imGuiWindowParams.showMenu_View = false;
+    runnerParams.imGuiWindowParams.showMenu_App_Quit = false;
     runnerParams.callbacks.ShowMenus = [&mainWindow]() {
         mainWindow.showMenus();
     };
