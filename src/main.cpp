@@ -18,7 +18,7 @@ int main(int argc, char **argv)
     runnerParams.appWindowParams.restorePreviousGeometry = true;
     
     // Enable full screen dock space
-    runnerParams.imGuiWindowParams.defaultImGuiWindowType = HelloImGui::DefaultImGuiWindowType::ProvideFullScreenDockSpace;
+    runnerParams.imGuiWindowParams.defaultImGuiWindowType = HelloImGui::DefaultImGuiWindowType::ProvideFullScreenWindow;
     
     // Setup menu and status bar
     runnerParams.imGuiWindowParams.showMenuBar = true;

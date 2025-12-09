@@ -16,32 +16,26 @@ MainWindow::~MainWindow()
 
 void MainWindow::showGui()
 {
-    // This will be called by HelloImGui as the main GUI function
-    // Main content area - HelloImGui handles the docking automatically
-    if (ImGui::Begin("Audio Practice"))
+    ImGui::Text("SongPractice - Audio Practice Tool");
+    ImGui::Separator();
+
+    if (m_audioEngine.hasAudio())
     {
-        ImGui::Text("SongPractice - Audio Practice Tool");
-        ImGui::Separator();
-        
-        if (m_audioEngine.hasAudio())
-        {
-            const std::string fileName = Utils::getFileName(m_audioEngine.loadedFilePath());
-            ImGui::Text("Current file: %s", fileName.c_str());
-            ImGui::Text("Duration: %s", Utils::formatTime(m_audioEngine.getDuration()).c_str());
-            ImGui::Text("Sample rate: %u Hz", m_audioEngine.getSampleRate());
-            ImGui::Text("Channels: %u", m_audioEngine.getChannelCount());
-        }
-        else
-        {
-            ImGui::Text("No audio file loaded");
-            ImGui::Text("Use File -> Open Audio File to load a track for practice.");
-        }
-        
-        renderAudioControls();
-        renderWaveformArea();
+        const std::string fileName = Utils::getFileName(m_audioEngine.loadedFilePath());
+        ImGui::Text("Current file: %s", fileName.c_str());
+        ImGui::Text("Duration: %s", Utils::formatTime(m_audioEngine.getDuration()).c_str());
+        ImGui::Text("Sample rate: %u Hz", m_audioEngine.getSampleRate());
+        ImGui::Text("Channels: %u", m_audioEngine.getChannelCount());
     }
-    ImGui::End();
-    
+    else
+    {
+        ImGui::Text("No audio file loaded");
+        ImGui::Text("Use File -> Open Audio File to load a track for practice.");
+    }
+
+    renderAudioControls();
+    renderWaveformArea();
+
     // Show debug windows if requested
     if (m_showDemo)
         ImGui::ShowDemoWindow(&m_showDemo);
