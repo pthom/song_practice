@@ -8,6 +8,7 @@
 #include <vector>
 
 #include <RtAudio.h>
+#include <SoundTouch.h>
 
 class AudioEngine
 {
@@ -36,6 +37,10 @@ public:
     bool isStreamRunning() const;
     bool isPlaybackFinished() const;
 
+    // Tempo control
+    void setTempoMultiplier(float multiplier);
+    float getTempoMultiplier() const;
+
     // Getters
     float getDuration() const;
     float getCurrentTime() const;
@@ -59,11 +64,15 @@ private:
                              RtAudioStreamStatus status,
                              void* userData);
 
+    void initializeSoundTouch();
+    void processTempo(const float* input, float* output, unsigned int frames);
+
     bool m_initialized = false;
     std::atomic<bool> m_playing{false};
     bool m_hasAudio = false;
     std::atomic<bool> m_endOfStream{false};
     std::atomic<float> m_currentTime{0.0f};
+    std::atomic<float> m_tempoMultiplier{1.0f};
     float m_duration = 0.0f;
     uint32_t m_sampleRate = 0;
     uint32_t m_channelCount = 0;
@@ -71,6 +80,11 @@ private:
     std::atomic<uint64_t> m_playbackFrameIndex{0};
     std::vector<float> m_audioBuffer;
     std::string m_loadedFilePath;
+
+    // SoundTouch processing
+    std::unique_ptr<soundtouch::SoundTouch> m_soundTouch;
+    std::vector<float> m_tempoBuffer;
+    static constexpr size_t TEMPO_BUFFER_SIZE = 4096;
 
     std::unique_ptr<RtAudio> m_rtaudio;
     RtAudio::StreamParameters m_streamParams{};

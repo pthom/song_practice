@@ -56,6 +56,8 @@ void MainWindow::loadSettings()
             if (m_audioEngine.loadAudioFile(m_appState.soundFilePath.c_str()))
             {
                 m_waveformDirty = true;
+                // Restore tempo setting
+                m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
                 // Seek to the saved play position
                 if (m_appState.playPosition > 0.0f)
                 {
@@ -110,6 +112,8 @@ void MainWindow::loadTrackSettings()
                 if (m_audioEngine.loadAudioFile(m_appState.soundFilePath.c_str()))
                 {
                     m_waveformDirty = true;
+                    // Restore tempo setting
+                    m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
                     // Seek to the saved play position
                     if (m_appState.playPosition > 0.0f)
                     {
@@ -274,6 +278,8 @@ void MainWindow::openAudioFile()
             {
                 m_appState.soundFilePath = filePath;
                 m_waveformDirty = true;
+                // Set tempo to current app state (may be default 1.0 or previously set value)
+                m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
                 HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded audio file: %s",
                               Utils::getFileName(filePath).c_str());
             }
@@ -357,10 +363,10 @@ void MainWindow::renderTempoControls()
 
     // Tempo slider with percentage display
     float tempoPercent = m_appState.tempoMultiplier * 100.0f;
-    if (ImGui::SliderFloat("Tempo", &tempoPercent, 50.0f, 150.0f, "%.0f%%"))
+    if (ImGui::SliderFloat("Tempo", &tempoPercent, 25.0f, 200.0f, "%.0f%%"))
     {
         m_appState.tempoMultiplier = tempoPercent / 100.0f;
-        // TODO: Update audio engine tempo when we implement the audio processing
+        m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
     }
 
     // Reset button
@@ -368,6 +374,7 @@ void MainWindow::renderTempoControls()
     if (ImGui::Button("Reset"))
     {
         m_appState.tempoMultiplier = 1.0f;
+        m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
     }
 
     if (!hasAudio)

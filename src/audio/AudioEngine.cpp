@@ -47,6 +47,9 @@ bool AudioEngine::initialize()
         m_streamOptions.flags = 0;  // use interleaved buffers (default)
         m_streamOptions.streamName = "SongPractice";
 
+        // Initialize SoundTouch
+        initializeSoundTouch();
+
         m_initialized = true;
         return true;
     }
@@ -117,6 +120,9 @@ bool AudioEngine::loadAudioFile(const char* filePath)
     m_currentTime.store(0.0f);
     m_endOfStream.store(false);
     m_duration = (m_sampleRate > 0) ? static_cast<float>(m_frameCount) / static_cast<float>(m_sampleRate) : 0.0f;
+
+    // Reinitialize SoundTouch with correct audio parameters
+    initializeSoundTouch();
 
     // Re-open stream for this audio format
     {
@@ -434,6 +440,98 @@ void AudioEngine::closeStreamLocked()
     m_streamRunning = false;
 }
 
+void AudioEngine::setTempoMultiplier(float multiplier)
+{
+    multiplier = std::clamp(multiplier, 0.25f, 4.0f);  // Limit to reasonable range
+    m_tempoMultiplier.store(multiplier);
+
+    if (m_soundTouch)
+    {
+        m_soundTouch->setTempo(multiplier);
+    }
+}
+
+float AudioEngine::getTempoMultiplier() const
+{
+    return m_tempoMultiplier.load();
+}
+
+void AudioEngine::initializeSoundTouch()
+{
+    m_soundTouch = std::make_unique<soundtouch::SoundTouch>();
+
+    if (m_hasAudio)
+    {
+        m_soundTouch->setSampleRate(m_sampleRate);
+        m_soundTouch->setChannels(m_channelCount);
+        m_soundTouch->setTempo(m_tempoMultiplier.load());
+
+        // Configure for real-time processing
+        m_soundTouch->setSetting(SETTING_USE_QUICKSEEK, 1);
+        m_soundTouch->setSetting(SETTING_USE_AA_FILTER, 1);
+    }
+
+    // Reserve buffer space
+    m_tempoBuffer.resize(TEMPO_BUFFER_SIZE * m_channelCount);
+}
+
+void AudioEngine::processTempo(const float* input, float* output, unsigned int frames)
+{
+    if (!m_soundTouch || !m_hasAudio)
+    {
+        std::fill(output, output + frames * m_streamChannels, 0.0f);
+        return;
+    }
+
+    const uint64_t currentIndex = m_playbackFrameIndex.load();
+    const uint64_t framesRemaining = (currentIndex < m_frameCount) ? (m_frameCount - currentIndex) : 0;
+
+    if (framesRemaining == 0)
+    {
+        std::fill(output, output + frames * m_streamChannels, 0.0f);
+        m_playing.store(false);
+        m_endOfStream.store(true);
+        return;
+    }
+
+    // Calculate how many input frames we need for the requested output frames
+    const float tempoRatio = m_tempoMultiplier.load();
+    const unsigned int inputFramesNeeded = static_cast<unsigned int>(frames * tempoRatio) + 64; // Add some buffer
+    const unsigned int inputFramesAvailable = static_cast<unsigned int>(std::min<uint64_t>(inputFramesNeeded, framesRemaining));
+
+    // Feed audio data to SoundTouch
+    const float* sourceData = input + (currentIndex * m_streamChannels);
+    m_soundTouch->putSamples(sourceData, inputFramesAvailable);
+
+    // Try to receive processed samples
+    unsigned int outputSamples = 0;
+    unsigned int totalOutputSamples = 0;
+
+    while (totalOutputSamples < frames && (outputSamples = m_soundTouch->receiveSamples(
+        output + totalOutputSamples * m_streamChannels,
+        frames - totalOutputSamples)) > 0)
+    {
+        totalOutputSamples += outputSamples;
+    }
+
+    // Fill remaining buffer with silence if needed
+    if (totalOutputSamples < frames)
+    {
+        std::fill(output + totalOutputSamples * m_streamChannels,
+                 output + frames * m_streamChannels, 0.0f);
+    }
+
+    // Update playback position based on input consumption
+    m_playbackFrameIndex.store(currentIndex + inputFramesAvailable);
+
+    // Check for end of stream
+    if (currentIndex + inputFramesAvailable >= m_frameCount)
+    {
+        m_playing.store(false);
+        m_endOfStream.store(true);
+    }
+}
+
 int AudioEngine::processAudio(float* output, unsigned int frames, RtAudioStreamStatus status)
 {
     if (status != 0)
@@ -447,21 +545,39 @@ int AudioEngine::processAudio(float* output, unsigned int frames, RtAudioStreamS
         return 0;
     }
 
+    const float currentTempo = m_tempoMultiplier.load();
     const uint64_t currentIndex = m_playbackFrameIndex.load();
-    const uint64_t framesRemaining = (currentIndex < m_frameCount) ? (m_frameCount - currentIndex) : 0;
-    const unsigned int framesToCopy = static_cast<unsigned int>(std::min<uint64_t>(frames, framesRemaining));
 
-    const float* source = m_audioBuffer.data() + (currentIndex * m_streamChannels);
-    std::copy(source, source + framesToCopy * m_streamChannels, output);
-
-    if (framesToCopy < frames)
+    // Check if we need tempo processing
+    if (std::abs(currentTempo - 1.0f) < 0.001f || !m_soundTouch)
     {
-        std::fill(output + framesToCopy * m_streamChannels, output + frames * m_streamChannels, 0.0f);
-        m_playing.store(false);
-        m_endOfStream.store(true);
+        // No tempo adjustment needed, use direct copy
+        const uint64_t framesRemaining = (currentIndex < m_frameCount) ? (m_frameCount - currentIndex) : 0;
+        const unsigned int framesToCopy = static_cast<unsigned int>(std::min<uint64_t>(frames, framesRemaining));
+
+        if (framesToCopy > 0)
+        {
+            const float* source = m_audioBuffer.data() + (currentIndex * m_streamChannels);
+            std::copy(source, source + framesToCopy * m_streamChannels, output);
+        }
+
+        if (framesToCopy < frames)
+        {
+            std::fill(output + framesToCopy * m_streamChannels, output + frames * m_streamChannels, 0.0f);
+            m_playing.store(false);
+            m_endOfStream.store(true);
+        }
+        else
+        {
+            m_playbackFrameIndex.store(currentIndex + framesToCopy);
+        }
+    }
+    else
+    {
+        // Use SoundTouch for tempo processing
+        processTempo(m_audioBuffer.data(), output, frames);
     }
 
-    m_playbackFrameIndex.store(currentIndex + framesToCopy);
     const float time = static_cast<float>(m_playbackFrameIndex.load()) / static_cast<float>(m_sampleRate);
     m_currentTime.store(time);
 
