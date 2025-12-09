@@ -31,6 +31,7 @@ public:
     void pause();
     void stop();
     void seek(float timeSeconds);
+    void seekBy(float delay);
     bool isPlaying() const;
     bool isStreamRunning() const;
     bool isPlaybackFinished() const;

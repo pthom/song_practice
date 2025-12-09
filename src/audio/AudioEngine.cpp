@@ -206,6 +206,12 @@ void AudioEngine::seek(float timeSeconds)
     m_endOfStream.store(false);
 }
 
+void AudioEngine::seekBy(float delay)
+{
+    const float currentTime = m_currentTime.load();
+    seek(currentTime + delay);
+}
+
 bool AudioEngine::isPlaying() const
 {
     return m_playing.load();

@@ -6,6 +6,13 @@
 #include "portable_file_dialogs/portable_file_dialogs.h"
 #include "hello_imgui/icons_font_awesome_6.h"
 
+namespace
+{
+    constexpr float kSeekStep = 1.0f;
+    constexpr ImVec2 kTransportButtonSize = ImVec2(40.0f, 40.0f);
+    constexpr float kTransportSpacing = 14.0f;
+}
+
 
 MainWindow::MainWindow()
 {
@@ -118,38 +125,69 @@ void MainWindow::renderAudioControls()
 {
     ImGui::Spacing();
     ImGui::Text("Audio Controls:");
-    
+
     const bool hasAudio = m_audioEngine.hasAudio();
-    
-    if (!hasAudio) ImGui::BeginDisabled();
 
-    ImGui::PushFont(nullptr, 24.0f); // Use a larger font for icons
-    if (ImGui::Button(ICON_FA_PLAY))
-    {
-        m_audioEngine.play();
-    }
+    if (!hasAudio)
+        ImGui::BeginDisabled();
+
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(kTransportSpacing, 10.0f));
+
+    auto transportButton = [](const char* icon, const char* tooltip, bool autorepeat = false) -> bool{
+        bool pressed = false;
+        ImGui::PushID(icon);
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.8f, 0.8f, 0.8f, 0.35f));
+        if (autorepeat)
+            ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true);
+        pressed = ImGui::Button(icon, kTransportButtonSize);
+        if (autorepeat)
+            ImGui::PopItemFlag();
+        if (ImGui::IsItemHovered(ImGuiHoveredFlags_DelayNormal) && tooltip)
+            ImGui::SetTooltip("%s", tooltip);
+        ImGui::PopStyleColor();
+        ImGui::PopID();
+        return pressed;
+    };
+
+    if (transportButton(ICON_FA_BACKWARD, "Rewind 1 second", true))
+        m_audioEngine.seekBy(-kSeekStep);
+
     ImGui::SameLine();
-    if (ImGui::Button(ICON_FA_PAUSE))
+    const bool isPlaying = m_audioEngine.isPlaying();
+    const char* playIcon = isPlaying ? ICON_FA_PAUSE : ICON_FA_PLAY;
+    if (transportButton(playIcon, isPlaying ? "Pause" : "Play"))
     {
-        m_audioEngine.pause();
+        if (isPlaying)
+            m_audioEngine.pause();
+        else
+            m_audioEngine.play();
     }
+
     ImGui::SameLine();
-    if (ImGui::Button(ICON_FA_STOP))
-    {
+    if (transportButton(ICON_FA_STOP, "Stop"))
         m_audioEngine.stop();
-    }
-    ImGui::PopFont();
 
-    if (!hasAudio) ImGui::EndDisabled();
-    
-    // Time display
-    if (hasAudio)
-    {
-        ImGui::SameLine();
-        ImGui::Text("Time: %s / %s", 
-                   Utils::formatTime(m_audioEngine.getCurrentTime()).c_str(),
-                   Utils::formatTime(m_audioEngine.getDuration()).c_str());
-    }
+    ImGui::SameLine();
+
+    if (transportButton(ICON_FA_FORWARD, "Forward 1 second", true))
+        m_audioEngine.seekBy(kSeekStep);
+
+    ImGui::PopStyleVar();
+
+    if (!hasAudio)
+        ImGui::EndDisabled();
+
+    ImGui::SameLine();
+    ImGui::Dummy(ImVec2(20.0f, 0));
+    ImGui::SameLine();
+
+    const ImVec4 timeColor = isPlaying ? ImVec4(0.2f, 0.85f, 0.4f, 1.0f)
+                                       : ImVec4(0.8f, 0.8f, 0.8f, 1.0f);
+    ImGui::PushStyleColor(ImGuiCol_Text, timeColor);
+    ImGui::Text("%s / %s",
+                Utils::formatTime(m_audioEngine.getCurrentTime()).c_str(),
+                Utils::formatTime(m_audioEngine.getDuration()).c_str());
+    ImGui::PopStyleColor();
 }
 
 void MainWindow::renderWaveformArea()

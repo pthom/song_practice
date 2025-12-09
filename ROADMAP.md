@@ -34,8 +34,15 @@ This document outlines the development strategy for SongPractice, broken down in
    - Implement cursor dragging for scrubbing through audio
 
 6. **Basic Playback Controls UI**
-   - Create ImGui controls for play/pause/stop buttons, seek buttons (+/-1/5/10 seconds)
-   - Add current time display with total duration
+   - Create ImGui controls for play/pause buttons
+   - Add seek buttons (using ImGui::PushItemFlag(ImGuiItemFlags_ButtonRepeat, true) so that buttons can be held down)
+   - Present controls as a single horizontal row with generous spacing so singers can hit buttons quickly, even during practice sessions
+   - Use icon-enabled buttons (Font Awesome via Hello ImGui) with hovered tooltips and disabled states that reflect the AudioEngine (e.g., greyed-out Pause when nothing is playing)
+   - The play button should toggle to a pause icon when playing, and vice versa
+   - Add a button to stop playback and reset position to start
+
+  - Add current time display with total duration
+  - Show transport status inline (e.g., "2:13 / 5:05") and color it differently while recording/playing in later phases
 
 ### Phase 3: Practice Features (Tasks 7-8)
 **Goal**: Implement core practice functionality
