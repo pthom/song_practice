@@ -6,6 +6,13 @@
 
 #include "imgui.h"
 
+struct MarkerView
+{
+    std::string label;
+    float timeSeconds = 0.0f;
+    bool isCurrent = false;
+};
+
 class WaveformRenderer
 {
 public:
@@ -18,7 +25,8 @@ public:
     bool draw(const char* plotId,
               const ImVec2& size,
               float currentTimeSeconds,
-              float& outSeekTimeSeconds) const;
+              float& outSeekTimeSeconds,
+              const std::vector<MarkerView>& markers) const;
 
 private:
     struct ChannelEnvelope

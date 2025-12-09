@@ -1,10 +1,12 @@
 #include "MainWindow.h"
 #include "imgui.h"
+#include "imgui_stdlib.h"
 #include "implot/implot.h"
 #include "hello_imgui/hello_imgui.h"
 #include "core/Utils.h"
 #include "portable_file_dialogs/portable_file_dialogs.h"
 #include "hello_imgui/icons_font_awesome_6.h"
+#include <algorithm>
 
 namespace
 {
@@ -48,6 +50,7 @@ void MainWindow::showGui()
     }
 
     renderAudioControls();
+    renderMarkerControls();
     renderWaveformArea();
 
     // Show debug windows if requested
@@ -190,6 +193,67 @@ void MainWindow::renderAudioControls()
     ImGui::PopStyleColor();
 }
 
+void MainWindow::renderMarkerControls()
+{
+    if (!m_audioEngine.hasAudio())
+        return;
+
+    ImGui::Spacing();
+    ImGui::Separator();
+    ImGui::Text("Markers:");
+
+    if (ImGui::Button("Add Marker"))
+    {
+        Marker marker;
+        marker.timeSeconds = m_audioEngine.getCurrentTime();
+        marker.name = "Marker " + Utils::formatTime(marker.timeSeconds);
+        m_markers.push_back(marker);
+        sortMarkers();
+    }
+    ImGui::SameLine();
+    const bool hasMarkers = !m_markers.empty();
+    if (!hasMarkers)
+        ImGui::BeginDisabled();
+    if (ImGui::Button("Previous Marker"))
+    {
+        const int idx = currentMarkerIndex();
+        if (idx > 0)
+            m_audioEngine.seek(m_markers[idx - 1].timeSeconds);
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Next Marker"))
+    {
+        const int idx = currentMarkerIndex();
+        if (idx >= 0 && idx + 1 < static_cast<int>(m_markers.size()))
+            m_audioEngine.seek(m_markers[idx + 1].timeSeconds);
+    }
+    if (!hasMarkers)
+        ImGui::EndDisabled();
+
+    const int currentIdx = currentMarkerIndex();
+    if (currentIdx >= 0)
+    {
+        ImGui::Separator();
+        Marker& marker = m_markers[currentIdx];
+        ImGui::InputText("Name", &marker.name);
+        float newTime = marker.timeSeconds;
+        if (ImGui::DragFloat("Position (s)", &newTime, 0.1f, 0.0f, m_audioEngine.getDuration()))
+        {
+            marker.timeSeconds = std::clamp(newTime, 0.0f, m_audioEngine.getDuration());
+            sortMarkers();
+        }
+        if (ImGui::Button("Delete Marker"))
+        {
+            m_markers.erase(m_markers.begin() + currentIdx);
+        }
+    }
+    else if (hasMarkers)
+    {
+        ImGui::Separator();
+        ImGui::TextDisabled("Move playhead near a marker to edit it.");
+    }
+}
+
 void MainWindow::renderWaveformArea()
 {
     ImGui::Spacing();
@@ -200,7 +264,23 @@ void MainWindow::renderWaveformArea()
     {
         ImPlot::SetNextAxesLimits(0.0, m_audioEngine.getDuration(), -1.0, 1.0, ImGuiCond_Once);
         float seekTime = 0.0f;
-        if (m_waveformRenderer.draw("WaveformPlot", ImVec2(-1, -1), m_audioEngine.getCurrentTime(), seekTime))
+        std::vector<MarkerView> markerViews;
+        markerViews.reserve(m_markers.size());
+        const int currentIdx = currentMarkerIndex();
+        for (int i = 0; i < static_cast<int>(m_markers.size()); ++i)
+        {
+            MarkerView mv;
+            mv.label = m_markers[i].name;
+            mv.timeSeconds = m_markers[i].timeSeconds;
+            mv.isCurrent = (i == currentIdx);
+            markerViews.push_back(std::move(mv));
+        }
+
+        if (m_waveformRenderer.draw("WaveformPlot",
+                                     ImVec2(-1, -1),
+                                     m_audioEngine.getCurrentTime(),
+                                     seekTime,
+                                     markerViews))
         {
             m_audioEngine.seek(seekTime);
         }
@@ -255,4 +335,25 @@ void MainWindow::showStatus()
     {
         ImGui::Text("No audio loaded");
     }
+}
+
+int MainWindow::currentMarkerIndex() const
+{
+    const float currentTime = m_audioEngine.getCurrentTime();
+    int idx = -1;
+    for (int i = 0; i < static_cast<int>(m_markers.size()); ++i)
+    {
+        if (m_markers[i].timeSeconds <= currentTime)
+            idx = i;
+        else
+            break;
+    }
+    return idx;
+}
+
+void MainWindow::sortMarkers()
+{
+    std::sort(m_markers.begin(), m_markers.end(), [](const Marker& a, const Marker& b) {
+        return a.timeSeconds < b.timeSeconds;
+    });
 }

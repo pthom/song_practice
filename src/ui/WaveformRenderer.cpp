@@ -50,7 +50,8 @@ bool WaveformRenderer::hasWaveform() const
 bool WaveformRenderer::draw(const char* plotId,
                             const ImVec2& size,
                             float currentTimeSeconds,
-                            float& outSeekTimeSeconds) const
+                            float& outSeekTimeSeconds,
+                            const std::vector<MarkerView>& markers) const
 {
     outSeekTimeSeconds = currentTimeSeconds;
 
@@ -63,6 +64,7 @@ bool WaveformRenderer::draw(const char* plotId,
     const ImPlotFlags plotFlags = ImPlotFlags_CanvasOnly | ImPlotFlags_NoMenus;
     if (ImPlot::BeginPlot(plotId, size, plotFlags))
     {
+        ImPlot::SetupLegend(ImPlotLocation_NorthWest, ImPlotLegendFlags_Outside | ImPlotLegendFlags_NoButtons);
         ImPlotAxisFlags axisFlags = ImPlotAxisFlags_NoHighlight | ImPlotAxisFlags_Lock;
         ImPlot::SetupAxisLimits(ImAxis_X1, 0.0, m_durationSeconds, ImGuiCond_Always);
         ImPlot::SetupAxisLimits(ImAxis_Y1, -1.0, 1.0, ImGuiCond_Always);
@@ -91,6 +93,15 @@ bool WaveformRenderer::draw(const char* plotId,
                                    static_cast<int>(level->times.size()));
                 ImPlot::PopStyleColor();
             }
+        }
+
+        for (const auto& marker : markers)
+        {
+            const double markerX = marker.timeSeconds;
+            const ImVec4 color = marker.isCurrent ? ImVec4(1.0f, 0.6f, 0.1f, 1.0f)
+                                                  : ImVec4(0.6f, 0.8f, 1.0f, 1.0f);
+            const std::string id = "Marker##" + marker.label;
+            ImPlot::TagX(markerX, color, "%s", marker.label.c_str());
         }
 
         double cursorValue = static_cast<double>(currentTimeSeconds);
