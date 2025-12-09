@@ -57,9 +57,14 @@ This document outlines the development strategy for SongPractice, broken down in
    - Keep the stop button in place for now; keyboard shortcuts (arrows for marker navigation) will be tackled in a later iteration once the marker workflow is stable
 
 8. **Settings Persistence**
-Implement persistence for ApplicationState, with JSON serialization using nlohmann/json
-Save and load user settings (e.g., last opened file, markers) on application start/exit
-
+   - Implement persistence for ApplicationState, with JSON serialization using nlohmann/json
+   - Save and load global settings (last opened file, markers, play position) on application start/exit
+   - Add per-track settings functionality with manual load/save via menu items:
+     - "Load Track Settings..." menu item that opens a file dialog to select a .songpractice.json file
+     - "Save Track Settings..." menu item that opens a file dialog to save current markers and settings
+     - Per-track settings include: markers, play position, and associated audio file path
+     - Use portable-file-dialogs (pfd) for cross-platform file selection
+     - Settings files use .songpractice.json extension for easy identification
 
 ### Phase 4: Advanced Features (Tasks 9-10)
 **Goal**: Add tempo control and polish the application

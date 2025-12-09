@@ -37,7 +37,11 @@ public:
     
     // File operations
     void openAudioFile();
-    
+
+    // Track settings operations
+    void loadTrackSettings();
+    void saveTrackSettings();
+
 private:
 
     void renderAudioControls();

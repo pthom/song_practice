@@ -7,6 +7,7 @@
 #include "portable_file_dialogs/portable_file_dialogs.h"
 #include "hello_imgui/icons_font_awesome_6.h"
 #include <algorithm>
+#include <filesystem>
 
 namespace
 {
@@ -83,6 +84,108 @@ void MainWindow::saveSettings()
     m_settingsManager.saveGlobalSettings(m_appState);
 }
 
+void MainWindow::loadTrackSettings()
+{
+    // Use portable-file-dialogs for settings file selection
+    auto selection = pfd::open_file("Load Track Settings",
+                                   "",
+                                   {"SongPractice Settings", "*.songpractice.json",
+                                    "JSON Files", "*.json",
+                                    "All Files", "*"},
+                                   pfd::opt::none).result();
+
+    if (!selection.empty())
+    {
+        const std::string settingsPath = selection[0];
+        ApplicationState tempState;
+
+        if (m_settingsManager.loadTrackSettings(settingsPath, tempState))
+        {
+            // Successfully loaded settings
+            m_appState = tempState;
+
+            // Try to load the audio file if specified
+            if (!m_appState.soundFilePath.empty())
+            {
+                if (m_audioEngine.loadAudioFile(m_appState.soundFilePath.c_str()))
+                {
+                    m_waveformDirty = true;
+                    // Seek to the saved play position
+                    if (m_appState.playPosition > 0.0f)
+                    {
+                        m_audioEngine.seek(m_appState.playPosition);
+                    }
+                    HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded track settings and audio file: %s",
+                                  Utils::getFileName(m_appState.soundFilePath).c_str());
+                }
+                else
+                {
+                    HelloImGui::Log(HelloImGui::LogLevel::Warning,
+                                  "Loaded track settings but couldn't load audio file: %s",
+                                  Utils::getFileName(m_appState.soundFilePath).c_str());
+                }
+            }
+            else
+            {
+                HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded track settings: %s",
+                              Utils::getFileName(settingsPath).c_str());
+            }
+        }
+        else
+        {
+            HelloImGui::Log(HelloImGui::LogLevel::Error, "Failed to load track settings: %s",
+                          Utils::getFileName(settingsPath).c_str());
+        }
+    }
+}
+
+void MainWindow::saveTrackSettings()
+{
+    // Update current play position before saving
+    if (m_audioEngine.hasAudio())
+    {
+        m_appState.playPosition = m_audioEngine.getCurrentTime();
+    }
+
+    // Default filename based on current audio file
+    std::string defaultName = "track-settings";
+    if (!m_appState.soundFilePath.empty())
+    {
+        std::filesystem::path audioPath(m_appState.soundFilePath);
+        defaultName = audioPath.stem().string() + "-settings";
+    }
+    defaultName += ".songpractice.json";
+
+    // Use portable-file-dialogs for save location selection
+    auto result = pfd::save_file("Save Track Settings",
+                                defaultName,
+                                {"SongPractice Settings", "*.songpractice.json",
+                                 "JSON Files", "*.json",
+                                 "All Files", "*"}).result();
+
+    if (!result.empty())
+    {
+        std::string settingsPath = result;
+
+        // Ensure the file has the correct extension
+        if (!Utils::stringEndsWith(settingsPath, ".songpractice.json"))
+        {
+            settingsPath += ".songpractice.json";
+        }
+
+        if (m_settingsManager.saveTrackSettings(settingsPath, m_appState))
+        {
+            HelloImGui::Log(HelloImGui::LogLevel::Info, "Saved track settings: %s",
+                          Utils::getFileName(settingsPath).c_str());
+        }
+        else
+        {
+            HelloImGui::Log(HelloImGui::LogLevel::Error, "Failed to save track settings: %s",
+                          Utils::getFileName(settingsPath).c_str());
+        }
+    }
+}
+
 void MainWindow::renderAudioInfo()
 {
     if (m_audioEngine.hasAudio())
@@ -126,6 +229,19 @@ void MainWindow::showMenus()
         {
             openAudioFile();
         }
+
+        ImGui::Separator();
+
+        if (ImGui::MenuItem("Load Track Settings..."))
+        {
+            loadTrackSettings();
+        }
+
+        if (ImGui::MenuItem("Save Track Settings..."))
+        {
+            saveTrackSettings();
+        }
+
         ImGui::EndMenu();
     }
 }
