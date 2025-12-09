@@ -3,6 +3,15 @@
 #include <iomanip>
 #include <algorithm>
 
+#ifdef _WIN32
+    #include <windows.h>
+#elif defined(__APPLE__)
+    #include <mach-o/dyld.h>
+    #include <unistd.h>
+#else
+    #include <unistd.h>
+#endif
+
 namespace Utils
 {
     std::string formatTime(float seconds)
@@ -47,5 +56,34 @@ namespace Utils
         if (str.length() < suffix.length())
             return false;
         return str.compare(str.length() - suffix.length(), suffix.length(), suffix) == 0;
+    }
+
+    std::string getExecutableDirectory()
+    {
+#ifdef _WIN32
+        char path[MAX_PATH];
+        GetModuleFileNameA(NULL, path, MAX_PATH);
+        std::string fullPath(path);
+        return fullPath.substr(0, fullPath.find_last_of("\\"));
+#elif defined(__APPLE__)
+        char path[PATH_MAX];
+        uint32_t size = sizeof(path);
+        if (_NSGetExecutablePath(path, &size) == 0)
+        {
+            std::string fullPath(path);
+            return fullPath.substr(0, fullPath.find_last_of("/"));
+        }
+        return ".";
+#else
+        char path[PATH_MAX];
+        ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
+        if (len != -1)
+        {
+            path[len] = '\0';
+            std::string fullPath(path);
+            return fullPath.substr(0, fullPath.find_last_of("/"));
+        }
+        return ".";
+#endif
     }
 }

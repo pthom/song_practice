@@ -25,7 +25,6 @@ public:
     std::string getTrackSettingsPath(const std::string& trackPath) const;
 
 private:
-    std::string getExecutableDirectory() const;
     void logError(const std::string& message) const;
 
     // JSON serialization helpers

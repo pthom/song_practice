@@ -11,4 +11,7 @@ namespace Utils
     std::string getFileExtension(const std::string& filePath);
     bool isAudioFile(const std::string& filePath);
     bool stringEndsWith(const std::string& str, const std::string& suffix);
+
+    // System utilities
+    std::string getExecutableDirectory();
 }

@@ -1,20 +1,11 @@
 #include "SettingsManager.h"
 #include "ui/MainWindow.h"  // For ApplicationState and Marker structs
+#include "Utils.h"
 #include <nlohmann/json.hpp>
 #include <fstream>
 #include <iostream>
 #include <filesystem>
 
-#ifdef _WIN32
-    #include <windows.h>
-#elif defined(__APPLE__)
-    #include <mach-o/dyld.h>
-    #include <limits.h>
-    #include <unistd.h>
-#else
-    #include <unistd.h>
-    #include <limits.h>
-#endif
 
 using json = nlohmann::json;
 
@@ -52,7 +43,7 @@ bool SettingsManager::saveTrackSettings(const std::string& settingsFilePath, con
 
 std::string SettingsManager::getGlobalSettingsPath() const
 {
-    return getExecutableDirectory() + "/" + GLOBAL_SETTINGS_FILENAME;
+    return Utils::getExecutableDirectory() + "/" + GLOBAL_SETTINGS_FILENAME;
 }
 
 std::string SettingsManager::getTrackSettingsPath(const std::string& trackPath) const
@@ -62,34 +53,7 @@ std::string SettingsManager::getTrackSettingsPath(const std::string& trackPath) 
     return path.parent_path().string() + "/" + stem + TRACK_SETTINGS_EXTENSION;
 }
 
-std::string SettingsManager::getExecutableDirectory() const
-{
-#ifdef _WIN32
-    char path[MAX_PATH];
-    GetModuleFileNameA(NULL, path, MAX_PATH);
-    std::string fullPath(path);
-    return fullPath.substr(0, fullPath.find_last_of("\\"));
-#elif defined(__APPLE__)
-    char path[PATH_MAX];
-    uint32_t size = sizeof(path);
-    if (_NSGetExecutablePath(path, &size) == 0)
-    {
-        std::string fullPath(path);
-        return fullPath.substr(0, fullPath.find_last_of("/"));
-    }
-    return ".";
-#else
-    char path[PATH_MAX];
-    ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
-    if (len != -1)
-    {
-        path[len] = '\0';
-        std::string fullPath(path);
-        return fullPath.substr(0, fullPath.find_last_of("/"));
-    }
-    return ".";
-#endif
-}
+
 
 void SettingsManager::logError(const std::string& message) const
 {
