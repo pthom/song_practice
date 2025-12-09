@@ -40,16 +40,21 @@ This document outlines the development strategy for SongPractice, broken down in
    - Use icon-enabled buttons (Font Awesome via Hello ImGui) with hovered tooltips and disabled states that reflect the AudioEngine (e.g., greyed-out Pause when nothing is playing)
    - The play button should toggle to a pause icon when playing, and vice versa
    - Add a button to stop playback and reset position to start
-
   - Add current time display with total duration
   - Show transport status inline (e.g., "2:13 / 5:05") and color it differently while recording/playing in later phases
 
 ### Phase 3: Practice Features (Tasks 7-8)
 **Goal**: Implement core practice functionality
 
-7. **Loop Points System**
-   - Implement LoopManager class to set start/end loop points via Shift+click on waveform
-   - Add visual loop region highlighting and loop playback logic
+- Pressing the space bar should toggle play/pause functionality
+
+7. **Markers**
+   - Provide an "Add Marker" button that drops a marker at the current playback position; markers are stored per track once SettingsManager is available
+   - Render markers directly on the waveform using ImPlot legends; the marker immediately preceding the playhead becomes the "current" marker and is highlighted with a distinct color in the plot
+   - Place the marker legend inside the plot area (ImPlot legend widgets) so singers can see labels without shifting their focus away from the waveform
+   - Expose inline edit controls (no popup dialogs) for the current marker so users can rename, delete, or nudge its timestamp without leaving the main UI
+   - Add previous/next marker buttons that always seek to adjacent markers; if no markers exist, these buttons remain disabled until separate time-based seek controls are introduced
+   - Keep the stop button in place for now; keyboard shortcuts (arrows for marker navigation) will be tackled in a later iteration once the marker workflow is stable
 
 8. **Settings Persistence**
    - Create SettingsManager with JSON serialization for per-track settings (loop points, speed)
