@@ -27,10 +27,7 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/mackron/dr_libs.git
     GIT_TAG master
 )
-FetchContent_GetProperties(dr_libs)
-if(NOT dr_libs_POPULATED)
-    FetchContent_Populate(dr_libs)
-endif()
+FetchContent_MakeAvailable(dr_libs)
 
 # Source files
 set(SOURCES
