@@ -1,20 +1,43 @@
 #include "MainWindow.h"
 #include "imgui.h"
 #include "hello_imgui/hello_imgui.h"
+#include "core/Utils.h"
+#include "portable_file_dialogs/portable_file_dialogs.h"
 
 MainWindow::MainWindow()
 {
+    m_audioEngine.initialize();
 }
 
 MainWindow::~MainWindow()
 {
+    m_audioEngine.shutdown();
 }
 
-void MainWindow::render()
+void MainWindow::showGui()
 {
-    renderMenuBar();
-    renderMainArea();
-    renderStatusBar();
+    // This will be called by HelloImGui as the main GUI function
+    // Main content area - HelloImGui handles the docking automatically
+    if (ImGui::Begin("Audio Practice"))
+    {
+        ImGui::Text("SongPractice - Audio Practice Tool");
+        ImGui::Separator();
+        
+        if (!m_currentFile.empty())
+        {
+            ImGui::Text("Current file: %s", Utils::getFileName(m_currentFile).c_str());
+            ImGui::Text("Duration: %s", Utils::formatTime(m_audioEngine.getDuration()).c_str());
+        }
+        else
+        {
+            ImGui::Text("No audio file loaded");
+            ImGui::Text("Use File -> Open Audio File to load a track for practice.");
+        }
+        
+        renderAudioControls();
+        renderWaveformArea();
+    }
+    ImGui::End();
     
     // Show debug windows if requested
     if (m_showDemo)
@@ -23,125 +46,144 @@ void MainWindow::render()
         ImGui::ShowMetricsWindow(&m_showMetrics);
 }
 
-void MainWindow::renderMenuBar()
+void MainWindow::showMenus()
 {
-    if (ImGui::BeginMainMenuBar())
+    auto & runnerParams = *HelloImGui::GetRunnerParams();
+    
+    // Add our custom File menu
+    if (ImGui::BeginMenu("File"))
     {
-        if (ImGui::BeginMenu("File"))
+        if (ImGui::MenuItem("Open Audio File...", "Ctrl+O"))
         {
-            if (ImGui::MenuItem("Open Audio File...", "Ctrl+O"))
-            {
-                // TODO: Implement file opening
-            }
-            ImGui::Separator();
-            if (ImGui::MenuItem("Exit", "Alt+F4"))
-            {
-                // TODO: Implement save on exit
-                HelloImGui::GetRunnerParams()->appShallExit = true;
-            }
-            ImGui::EndMenu();
+            openAudioFile();
         }
-        
-        if (ImGui::BeginMenu("View"))
-        {
-            ImGui::MenuItem("Demo Window", nullptr, &m_showDemo);
-            ImGui::MenuItem("Metrics", nullptr, &m_showMetrics);
-            ImGui::EndMenu();
-        }
-        
-        if (ImGui::BeginMenu("Help"))
-        {
-            if (ImGui::MenuItem("About"))
-            {
-                // TODO: Show about dialog
-            }
-            ImGui::EndMenu();
-        }
-        
-        ImGui::EndMainMenuBar();
+        ImGui::EndMenu();
+    }
+    
+    // Add custom View menu items
+    if (ImGui::BeginMenu("View"))
+    {
+        ImGui::MenuItem("Demo Window", nullptr, &m_showDemo);
+        ImGui::MenuItem("Metrics Window", nullptr, &m_showMetrics);
+        ImGui::EndMenu();
     }
 }
 
-void MainWindow::renderMainArea()
+void MainWindow::openAudioFile()
 {
-    // Get the main viewport
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
+    // Use portable-file-dialogs for file selection
+    auto selection = pfd::open_file("Select Audio File", 
+                                   "",
+                                   {"Audio Files", "*.wav *.mp3 *.flac *.ogg *.m4a *.aac",
+                                    "All Files", "*"},
+                                   pfd::opt::none).result();
     
-    // Set up the main docking space
-    ImGui::SetNextWindowPos(viewport->WorkPos);
-    ImGui::SetNextWindowSize(viewport->WorkSize);
-    ImGui::SetNextWindowViewport(viewport->ID);
-    
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoCollapse | 
-                                   ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
-                                   ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-    
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    
-    ImGui::Begin("MainDockSpace", nullptr, window_flags);
-    ImGui::PopStyleVar(3);
-    
-    // Create docking space
-    ImGuiID dockspace_id = ImGui::GetID("MainDockSpace");
-    ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), ImGuiDockNodeFlags_None);
-    
-    // Main content area
-    if (ImGui::Begin("Audio Practice"))
+    if (!selection.empty())
     {
-        ImGui::Text("SongPractice - Audio Practice Tool");
-        ImGui::Separator();
-        
-        ImGui::Text("Welcome to SongPractice!");
-        ImGui::Text("Use File -> Open Audio File to load a track for practice.");
-        
-        // Placeholder for future audio controls
-        ImGui::Spacing();
-        ImGui::Text("Audio Controls:");
-        if (ImGui::Button("Play"))
+        std::string filePath = selection[0];
+        if (Utils::isAudioFile(filePath))
         {
-            // TODO: Implement play
+            if (m_audioEngine.loadAudioFile(filePath.c_str()))
+            {
+                m_currentFile = filePath;
+                HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded audio file: %s", 
+                              Utils::getFileName(filePath).c_str());
+            }
+            else
+            {
+                HelloImGui::Log(HelloImGui::LogLevel::Error, "Failed to load audio file: %s", 
+                              Utils::getFileName(filePath).c_str());
+            }
         }
+        else
+        {
+            HelloImGui::Log(HelloImGui::LogLevel::Warning, "Unsupported file format: %s", 
+                          Utils::getFileName(filePath).c_str());
+        }
+    }
+}
+
+void MainWindow::renderAudioControls()
+{
+    ImGui::Spacing();
+    ImGui::Text("Audio Controls:");
+    
+    bool hasAudio = !m_currentFile.empty();
+    
+    if (!hasAudio) ImGui::BeginDisabled();
+    
+    if (ImGui::Button("Play"))
+    {
+        m_audioEngine.play();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Pause"))
+    {
+        m_audioEngine.pause();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Stop"))
+    {
+        m_audioEngine.stop();
+    }
+    
+    if (!hasAudio) ImGui::EndDisabled();
+    
+    // Time display
+    if (hasAudio)
+    {
         ImGui::SameLine();
-        if (ImGui::Button("Pause"))
-        {
-            // TODO: Implement pause
-        }
-        ImGui::SameLine();
-        if (ImGui::Button("Stop"))
-        {
-            // TODO: Implement stop
-        }
-        
-        // Placeholder for waveform
-        ImGui::Spacing();
-        ImGui::Text("Waveform Display:");
-        ImGui::BeginChild("Waveform", ImVec2(0, 200), true);
+        ImGui::Text("Time: %s / %s", 
+                   Utils::formatTime(m_audioEngine.getCurrentTime()).c_str(),
+                   Utils::formatTime(m_audioEngine.getDuration()).c_str());
+    }
+}
+
+void MainWindow::renderWaveformArea()
+{
+    ImGui::Spacing();
+    ImGui::Text("Waveform Display:");
+    ImGui::BeginChild("Waveform", ImVec2(0, 200), true);
+    
+    if (!m_currentFile.empty())
+    {
         ImGui::Text("Waveform visualization will appear here");
-        ImGui::EndChild();
+        ImGui::Text("File: %s", Utils::getFileName(m_currentFile).c_str());
+        ImGui::Text("Format: %s", Utils::getFileExtension(m_currentFile).c_str());
     }
-    ImGui::End();
+    else
+    {
+        ImGui::TextDisabled("Load an audio file to see waveform");
+    }
     
-    ImGui::End(); // MainDockSpace
+    ImGui::EndChild();
 }
 
-void MainWindow::renderStatusBar()
+void MainWindow::showStatus()
 {
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-    
-    // Position status bar at the bottom
-    ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x, viewport->WorkPos.y + viewport->WorkSize.y - 25));
-    ImGui::SetNextWindowSize(ImVec2(viewport->WorkSize.x, 25));
-    
-    ImGuiWindowFlags flags = ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | 
-                            ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar;
-    
-    if (ImGui::Begin("StatusBar", nullptr, flags))
+    // HelloImGui will handle the status bar layout, we just add content
+    if (m_audioEngine.isPlaying())
+    {
+        ImGui::Text("Playing");
+    }
+    else
     {
         ImGui::Text("Ready");
-        ImGui::SameLine(viewport->WorkSize.x - 150);
+    }
+    
+    // Add separator and file info
+    ImGui::SameLine();
+    ImGui::Text(" | ");
+    ImGui::SameLine();
+    
+    if (!m_currentFile.empty())
+    {
+        ImGui::Text("%s - %s", 
+                   Utils::getFileName(m_currentFile).c_str(),
+                   Utils::formatTime(m_audioEngine.getCurrentTime()).c_str());
+    }
+    else
+    {
         ImGui::Text("No audio loaded");
     }
-    ImGui::End();
 }

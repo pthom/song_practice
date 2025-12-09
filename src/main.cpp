@@ -17,9 +17,23 @@ int main(int argc, char **argv)
     runnerParams.appWindowParams.windowGeometry.size = {1200, 800};
     runnerParams.appWindowParams.restorePreviousGeometry = true;
     
-    // Setup GUI callback
+    // Enable full screen dock space
+    runnerParams.imGuiWindowParams.defaultImGuiWindowType = HelloImGui::DefaultImGuiWindowType::ProvideFullScreenDockSpace;
+    
+    // Setup menu and status bar
+    runnerParams.imGuiWindowParams.showMenuBar = true;
+    runnerParams.imGuiWindowParams.showStatusBar = true;
+    runnerParams.imGuiWindowParams.menuAppTitle = "SongPractice";
+    
+    // Setup callbacks using HelloImGui utilities
     runnerParams.callbacks.ShowGui = [&mainWindow]() {
-        mainWindow.render();
+        mainWindow.showGui();
+    };
+    runnerParams.callbacks.ShowMenus = [&mainWindow]() {
+        mainWindow.showMenus();
+    };
+    runnerParams.callbacks.ShowStatus = [&mainWindow]() {
+        mainWindow.showStatus();
     };
 
     // Run the application
