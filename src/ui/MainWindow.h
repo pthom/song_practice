@@ -1,6 +1,7 @@
 #pragma once
 #include "audio/AudioEngine.h"
 #include "ui/WaveformRenderer.h"
+#include "core/SettingsManager.h"
 #include <string>
 #include <vector>
 
@@ -22,6 +23,10 @@ class MainWindow
 public:
     MainWindow();
     ~MainWindow();
+
+    // Settings management
+    void loadSettings();
+    void saveSettings();
 
     void renderAudioInfo();
 
@@ -51,5 +56,6 @@ private:
     AudioEngine m_audioEngine;
     WaveformRenderer m_waveformRenderer;
     ApplicationState m_appState;
+    SettingsManager m_settingsManager;
     bool m_waveformDirty = false;
 };

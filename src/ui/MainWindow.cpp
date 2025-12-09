@@ -19,11 +19,51 @@ namespace
 MainWindow::MainWindow()
 {
     m_audioEngine.initialize();
+    loadSettings();
 }
 
 MainWindow::~MainWindow()
 {
+    saveSettings();
     m_audioEngine.shutdown();
+}
+
+void MainWindow::loadSettings()
+{
+    if (m_settingsManager.loadGlobalSettings(m_appState))
+    {
+        // If we loaded a sound file path, try to load it
+        if (!m_appState.soundFilePath.empty())
+        {
+            if (m_audioEngine.loadAudioFile(m_appState.soundFilePath.c_str()))
+            {
+                m_waveformDirty = true;
+                // Seek to the saved play position
+                if (m_appState.playPosition > 0.0f)
+                {
+                    m_audioEngine.seek(m_appState.playPosition);
+                }
+            }
+            else
+            {
+                // File couldn't be loaded, clear the path
+                m_appState.soundFilePath.clear();
+                m_appState.playPosition = 0.0f;
+                m_appState.markers.clear();
+            }
+        }
+    }
+}
+
+void MainWindow::saveSettings()
+{
+    // Update current play position before saving
+    if (m_audioEngine.hasAudio())
+    {
+        m_appState.playPosition = m_audioEngine.getCurrentTime();
+    }
+
+    m_settingsManager.saveGlobalSettings(m_appState);
 }
 
 void MainWindow::renderAudioInfo()

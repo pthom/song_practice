@@ -29,6 +29,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(dr_libs)
 
+# JSON library for settings persistence
+FetchContent_Declare(
+    nlohmann_json
+    GIT_REPOSITORY https://github.com/nlohmann/json.git
+    GIT_TAG v3.11.3
+)
+FetchContent_MakeAvailable(nlohmann_json)
+
 # Source files
 set(SOURCES
     src/main.cpp
@@ -40,6 +48,8 @@ set(SOURCES
     src/audio/AudioEngine.h
     src/core/Utils.cpp
     src/core/Utils.h
+    src/core/SettingsManager.cpp
+    src/core/SettingsManager.h
 )
 
 # Create executable
@@ -49,6 +59,7 @@ imgui_bundle_add_app(${PROJECT_NAME} ${SOURCES})
 target_link_libraries(${PROJECT_NAME} 
     PRIVATE 
     rtaudio
+    nlohmann_json::nlohmann_json
 )
 
 # Include directories

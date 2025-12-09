@@ -57,8 +57,9 @@ This document outlines the development strategy for SongPractice, broken down in
    - Keep the stop button in place for now; keyboard shortcuts (arrows for marker navigation) will be tackled in a later iteration once the marker workflow is stable
 
 8. **Settings Persistence**
-   - Create SettingsManager with JSON serialization for per-track settings (loop points, speed)
-   - Auto-save settings on changes, restore on track reload
+Implement persistence for ApplicationState, with JSON serialization using nlohmann/json
+Save and load user settings (e.g., last opened file, markers) on application start/exit
+
 
 ### Phase 4: Advanced Features (Tasks 9-10)
 **Goal**: Add tempo control and polish the application
