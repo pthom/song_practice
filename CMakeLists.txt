@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include(FetchContent)
 
 set(BUILD_SHARED_LIBS OFF)
+set(HELLOIMGUI_DOWNLOAD_FREETYPE_IF_NEEDED ON)
+set(HELLOIMGUI_USE_EXTERNAL_JSON ON)
 
 # Find Dear ImGui Bundle
 FetchContent_Declare(

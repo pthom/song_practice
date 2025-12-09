@@ -75,7 +75,7 @@ namespace Utils
         }
         return ".";
 #else
-        char path[PATH_MAX];
+        char path[1024];
         ssize_t len = readlink("/proc/self/exe", path, sizeof(path) - 1);
         if (len != -1)
         {
