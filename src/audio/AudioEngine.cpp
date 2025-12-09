@@ -194,6 +194,18 @@ void AudioEngine::stop()
     m_endOfStream.store(false);
 }
 
+void AudioEngine::seek(float timeSeconds)
+{
+    if (!m_hasAudio || m_sampleRate == 0)
+        return;
+
+    const float clampedTime = std::max(0.0f, std::min(timeSeconds, m_duration));
+    const uint64_t targetFrame = static_cast<uint64_t>(clampedTime * static_cast<float>(m_sampleRate));
+    m_playbackFrameIndex.store(std::min<uint64_t>(targetFrame, m_frameCount));
+    m_currentTime.store(clampedTime);
+    m_endOfStream.store(false);
+}
+
 bool AudioEngine::isPlaying() const
 {
     return m_playing.load();

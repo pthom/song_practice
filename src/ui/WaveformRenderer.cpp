@@ -47,12 +47,17 @@ bool WaveformRenderer::hasWaveform() const
     return !m_levels.empty();
 }
 
-void WaveformRenderer::draw(const char* plotId,
+bool WaveformRenderer::draw(const char* plotId,
                             const ImVec2& size,
-                            float currentTimeSeconds) const
+                            float currentTimeSeconds,
+                            float& outSeekTimeSeconds) const
 {
+    outSeekTimeSeconds = currentTimeSeconds;
+
     if (!hasWaveform())
-        return;
+        return false;
+
+    bool dragged = false;
 
     ImPlot::PushStyleVar(ImPlotStyleVar_PlotPadding, ImVec2(10.0f, 6.0f));
     if (ImPlot::BeginPlot(plotId, size, ImPlotFlags_CanvasOnly | ImPlotFlags_NoMenus))
@@ -83,16 +88,28 @@ void WaveformRenderer::draw(const char* plotId,
         }
 
         double cursorValue = static_cast<double>(currentTimeSeconds);
-        const ImPlotDragToolFlags cursorFlags =  ImPlotDragToolFlags_NoFit;
-        ImPlot::DragLineX(ImGui::GetID("PlaybackCursor"),
-                          &cursorValue,
-                          ImVec4(1.0f, 0.35f, 0.2f, 1.0f),
-                          2.0f,
-                          cursorFlags);
+        const ImPlotDragToolFlags cursorFlags = ImPlotDragToolFlags_NoFit;
+        bool clicked = false;
+        bool hovered = false;
+        bool held = false;
+        if (ImPlot::DragLineX(ImGui::GetID("PlaybackCursor"),
+                              &cursorValue,
+                              ImVec4(1.0f, 0.35f, 0.2f, 1.0f),
+                              2.0f,
+                              cursorFlags,
+                              &clicked,
+                              &hovered,
+                              &held))
+        {
+            dragged = true;
+            outSeekTimeSeconds = static_cast<float>(cursorValue);
+        }
 
         ImPlot::EndPlot();
     }
     ImPlot::PopStyleVar();
+
+    return dragged;
 }
 
 WaveformRenderer::WaveformLevel WaveformRenderer::buildLevel(const std::vector<float>& interleavedSamples,

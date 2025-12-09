@@ -28,11 +28,10 @@ This document outlines the development strategy for SongPractice, broken down in
 4. **Waveform Visualization**
    - Use ImPlot to render audio waveform with time axis
    - Downsample large audio files for efficient display
-   - Add zoom and scroll capabilities for navigation
 
 5. **Playback Position Indicator**
    - Add draggable cursor on waveform showing current playback position
-   - Implement click-to-seek and cursor dragging for scrubbing through audio
+   - Implement cursor dragging for scrubbing through audio
 
 6. **Basic Playback Controls UI**
    - Create ImGui controls for play/pause/stop buttons, seek buttons (+/-1/5/10 seconds)

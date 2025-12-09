@@ -15,9 +15,10 @@ public:
                      uint32_t channelCount,
                      uint32_t sampleRate);
     bool hasWaveform() const;
-    void draw(const char* plotId,
+    bool draw(const char* plotId,
               const ImVec2& size,
-              float currentTimeSeconds) const;
+              float currentTimeSeconds,
+              float& outSeekTimeSeconds) const;
 
 private:
     struct ChannelEnvelope
@@ -46,4 +47,3 @@ private:
     std::vector<WaveformLevel> m_levels;
     std::vector<uint32_t> m_bucketTargets = {64, 256, 1024, 4096, 16384};
 };
-

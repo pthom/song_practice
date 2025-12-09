@@ -139,7 +139,7 @@ void MainWindow::renderAudioControls()
         m_audioEngine.stop();
     }
     ImGui::PopFont();
-    
+
     if (!hasAudio) ImGui::EndDisabled();
     
     // Time display
@@ -161,7 +161,11 @@ void MainWindow::renderWaveformArea()
     if (m_audioEngine.hasAudio() && m_waveformRenderer.hasWaveform())
     {
         ImPlot::SetNextAxesLimits(0.0, m_audioEngine.getDuration(), -1.0, 1.0, ImGuiCond_Once);
-        m_waveformRenderer.draw("WaveformPlot", ImVec2(-1, -1), m_audioEngine.getCurrentTime());
+        float seekTime = 0.0f;
+        if (m_waveformRenderer.draw("WaveformPlot", ImVec2(-1, -1), m_audioEngine.getCurrentTime(), seekTime))
+        {
+            m_audioEngine.seek(seekTime);
+        }
     }
     else
     {

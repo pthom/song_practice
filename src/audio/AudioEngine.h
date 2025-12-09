@@ -30,6 +30,7 @@ public:
     void play();
     void pause();
     void stop();
+    void seek(float timeSeconds);
     bool isPlaying() const;
     bool isStreamRunning() const;
     bool isPlaybackFinished() const;
