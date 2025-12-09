@@ -57,6 +57,7 @@ void MainWindow::showGui()
     renderAudioControls();
     renderMarkerControls();
 
+    m_appState.playPosition = m_audioEngine.getCurrentTime();
 }
 
 void MainWindow::showMenus()
@@ -97,6 +98,7 @@ void MainWindow::openAudioFile()
 
             if (m_audioEngine.loadAudioFile(filePath.c_str()))
             {
+                m_appState.soundFilePath = filePath;
                 m_waveformDirty = true;
                 HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded audio file: %s",
                               Utils::getFileName(filePath).c_str());

@@ -4,6 +4,19 @@
 #include <string>
 #include <vector>
 
+struct Marker
+{
+    std::string name;
+    float timeSeconds = 0.0f;
+};
+
+struct ApplicationState
+{
+    std::vector<Marker> markers;
+    std::string soundFilePath;
+    float playPosition = 0.0f;
+};
+
 class MainWindow
 {
 public:
@@ -21,18 +34,6 @@ public:
     void openAudioFile();
     
 private:
-    struct Marker
-    {
-        std::string name;
-        float timeSeconds = 0.0f;
-    };
-
-    struct ApplicationState
-    {
-        std::vector<Marker> markers;
-        std::string soundFilePath;
-        float playPosition = 0.0f;
-    };
 
     void renderAudioControls();
 
