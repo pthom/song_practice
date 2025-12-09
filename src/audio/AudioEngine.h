@@ -1,8 +1,13 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <vector>
+
+#include <RtAudio.h>
 
 class AudioEngine
 {
@@ -19,13 +24,16 @@ public:
     void unloadAudio();
     bool hasAudio() const;
     std::string loadedFilePath() const;
-    
+    bool streamReady() const;
+
     // Playback control
     void play();
     void pause();
     void stop();
     bool isPlaying() const;
-    
+    bool isStreamRunning() const;
+    bool isPlaybackFinished() const;
+
     // Getters
     float getDuration() const;
     float getCurrentTime() const;
@@ -33,20 +41,43 @@ public:
     uint32_t getChannelCount() const;
     uint64_t getFrameCount() const;
     const std::vector<float>& getAudioData() const;
-    
+
 private:
     bool loadWavFile(const char* filePath);
     bool loadMp3File(const char* filePath);
     void resetState();
+    bool ensureStreamReadyLocked();
+    bool openStreamLocked();
+    void closeStreamLocked();
+    int processAudio(float* output, unsigned int frames, RtAudioStreamStatus status);
+    static int audioCallback(void* outputBuffer,
+                             void* inputBuffer,
+                             unsigned int nBufferFrames,
+                             double streamTime,
+                             RtAudioStreamStatus status,
+                             void* userData);
 
     bool m_initialized = false;
-    bool m_playing = false;
+    std::atomic<bool> m_playing{false};
     bool m_hasAudio = false;
+    std::atomic<bool> m_endOfStream{false};
+    std::atomic<float> m_currentTime{0.0f};
     float m_duration = 0.0f;
-    float m_currentTime = 0.0f;
     uint32_t m_sampleRate = 0;
     uint32_t m_channelCount = 0;
     uint64_t m_frameCount = 0;
+    std::atomic<uint64_t> m_playbackFrameIndex{0};
     std::vector<float> m_audioBuffer;
     std::string m_loadedFilePath;
+
+    std::unique_ptr<RtAudio> m_rtaudio;
+    RtAudio::StreamParameters m_streamParams{};
+    RtAudio::StreamOptions m_streamOptions{};
+    unsigned int m_bufferFrames = 512;
+    uint32_t m_streamSampleRate = 0;
+    uint32_t m_streamChannels = 0;
+    bool m_streamOpen = false;
+    bool m_streamRunning = false;
+    int m_defaultDeviceId = -1;
+    std::mutex m_streamMutex;
 };

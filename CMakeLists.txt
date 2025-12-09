@@ -55,4 +55,5 @@ target_include_directories(${PROJECT_NAME}
     src
     external
     ${dr_libs_SOURCE_DIR}
+    ${rtaudio_SOURCE_DIR}
 )
