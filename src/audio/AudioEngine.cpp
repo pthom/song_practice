@@ -210,6 +210,12 @@ void AudioEngine::seek(float timeSeconds)
     m_playbackFrameIndex.store(std::min<uint64_t>(targetFrame, m_frameCount));
     m_currentTime.store(clampedTime);
     m_endOfStream.store(false);
+
+    // Clear SoundTouch buffer to prevent audio artifacts from previous position
+    if (m_soundTouch)
+    {
+        m_soundTouch->clear();
+    }
 }
 
 void AudioEngine::seekBy(float delay)
@@ -466,9 +472,22 @@ void AudioEngine::initializeSoundTouch()
         m_soundTouch->setChannels(m_channelCount);
         m_soundTouch->setTempo(m_tempoMultiplier.load());
 
-        // Configure for real-time processing
-        m_soundTouch->setSetting(SETTING_USE_QUICKSEEK, 1);
+        // Configure for high-quality processing across all tempo ranges
+        // Disable quick seek for better quality (uses more CPU but sounds better)
+        m_soundTouch->setSetting(SETTING_USE_QUICKSEEK, 0);
+
+        // Enable high-quality anti-aliasing filter
         m_soundTouch->setSetting(SETTING_USE_AA_FILTER, 1);
+
+        // Optimized for extreme slowdowns (0.25x) while still good at normal speeds
+        // Longer sequences = better quality, especially for slow tempos
+        m_soundTouch->setSetting(SETTING_SEQUENCE_MS, 100);
+
+        // Larger seek window for better overlap matching
+        m_soundTouch->setSetting(SETTING_SEEKWINDOW_MS, 35);
+
+        // Increased overlap for smoother transitions
+        m_soundTouch->setSetting(SETTING_OVERLAP_MS, 24);
     }
 
     // Reserve buffer space
@@ -495,8 +514,9 @@ void AudioEngine::processTempo(const float* input, float* output, unsigned int f
     }
 
     // Calculate how many input frames we need for the requested output frames
+    // Larger buffer provides better quality processing across all tempo ranges
     const float tempoRatio = m_tempoMultiplier.load();
-    const unsigned int inputFramesNeeded = static_cast<unsigned int>(frames * tempoRatio) + 64; // Add some buffer
+    const unsigned int inputFramesNeeded = static_cast<unsigned int>(frames * tempoRatio) + 512;
     const unsigned int inputFramesAvailable = static_cast<unsigned int>(std::min<uint64_t>(inputFramesNeeded, framesRemaining));
 
     // Feed audio data to SoundTouch
@@ -512,6 +532,18 @@ void AudioEngine::processTempo(const float* input, float* output, unsigned int f
         frames - totalOutputSamples)) > 0)
     {
         totalOutputSamples += outputSamples;
+    }
+
+    // If we're near the end and still need more samples, flush the pipeline
+    if (totalOutputSamples < frames && currentIndex + inputFramesAvailable >= m_frameCount)
+    {
+        m_soundTouch->flush();
+        while (totalOutputSamples < frames && (outputSamples = m_soundTouch->receiveSamples(
+            output + totalOutputSamples * m_streamChannels,
+            frames - totalOutputSamples)) > 0)
+        {
+            totalOutputSamples += outputSamples;
+        }
     }
 
     // Fill remaining buffer with silence if needed
