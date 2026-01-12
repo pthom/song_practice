@@ -12,16 +12,21 @@ set(HELLOIMGUI_USE_EXTERNAL_JSON ON)
 
 # Find Dear ImGui Bundle
 FetchContent_Declare(
-    imgui_bundle 
-    GIT_REPOSITORY https://github.com/pthom/imgui_bundle.git 
-    GIT_TAG main)
+    imgui_bundle
+    GIT_REPOSITORY https://github.com/pthom/imgui_bundle.git
+    GIT_TAG main
+    EXCLUDE_FROM_ALL
+)
 FetchContent_MakeAvailable(imgui_bundle)
 
 # Add RtAudio as external dependency
+# RtAudio creates an "uninstall" target; GLFW already has one -> rename RtAudio's
+set(RTAUDIO_TARGETNAME_UNINSTALL "rtaudio_uninstall" CACHE STRING "" FORCE)
 FetchContent_Declare(
     rtaudio
     GIT_REPOSITORY https://github.com/thestk/rtaudio.git
     GIT_TAG 6.0.1
+    EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(rtaudio)
 
@@ -30,6 +35,7 @@ FetchContent_Declare(
     dr_libs
     GIT_REPOSITORY https://github.com/mackron/dr_libs.git
     GIT_TAG master
+    EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(dr_libs)
 
@@ -38,6 +44,7 @@ FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.11.3
+    EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(nlohmann_json)
 
@@ -68,16 +75,16 @@ set(SOURCES
 imgui_bundle_add_app(${PROJECT_NAME} ${SOURCES})
 
 # Link libraries
-target_link_libraries(${PROJECT_NAME} 
-    PRIVATE 
+target_link_libraries(${PROJECT_NAME}
+    PRIVATE
     rtaudio
     nlohmann_json::nlohmann_json
     SoundTouch
 )
 
 # Include directories
-target_include_directories(${PROJECT_NAME} 
-    PRIVATE 
+target_include_directories(${PROJECT_NAME}
+    PRIVATE
     src
     external
     ${dr_libs_SOURCE_DIR}
