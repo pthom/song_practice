@@ -64,4 +64,5 @@ private:
     ApplicationState m_appState;
     SettingsManager m_settingsManager;
     bool m_waveformDirty = false;
+    bool m_wasTempoProcessing = false;
 };

@@ -213,6 +213,15 @@ void MainWindow::showGui()
     ImGui::Text("SongPractice - Audio Practice Tool");
     ImGui::Separator();
 
+    // Check if tempo processing just completed
+    const bool isProcessing = m_audioEngine.isTempoProcessing();
+    if (m_wasTempoProcessing && !isProcessing)
+    {
+        // Tempo processing just finished, update waveform
+        m_waveformDirty = true;
+    }
+    m_wasTempoProcessing = isProcessing;
+
     if (m_audioEngine.hasAudio() && m_waveformDirty)
         updateWaveformData();
 
@@ -361,8 +370,9 @@ void MainWindow::renderTempoControls()
     ImGui::Text("Tempo Controls:");
 
     const bool hasAudio = m_audioEngine.hasAudio();
+    const bool isProcessing = m_audioEngine.isTempoProcessing();
 
-    if (!hasAudio)
+    if (!hasAudio || isProcessing)
         ImGui::BeginDisabled();
 
     // Tempo slider with percentage display
@@ -381,8 +391,17 @@ void MainWindow::renderTempoControls()
         m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
     }
 
-    if (!hasAudio)
+    if (!hasAudio || isProcessing)
         ImGui::EndDisabled();
+
+    // Show processing progress
+    if (isProcessing)
+    {
+        const float progress = m_audioEngine.getTempoProcessingProgress();
+        ImGui::ProgressBar(progress, ImVec2(-1, 0), "Processing tempo...");
+        ImGui::TextColored(ImVec4(1.0f, 1.0f, 0.0f, 1.0f),
+                          "Processing tempo change, please wait... (%.0f%%)", progress * 100.0f);
+    }
 }
 
 void MainWindow::seekToPreviousMarker()

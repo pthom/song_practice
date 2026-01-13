@@ -40,6 +40,8 @@ public:
     // Tempo control
     void setTempoMultiplier(float multiplier);
     float getTempoMultiplier() const;
+    bool isTempoProcessing() const;
+    float getTempoProcessingProgress() const;
 
     // Getters
     float getDuration() const;
@@ -64,8 +66,7 @@ private:
                              RtAudioStreamStatus status,
                              void* userData);
 
-    void initializeSoundTouch();
-    void processTempo(const float* input, float* output, unsigned int frames);
+    void reprocessAudioWithTempo(float multiplier);
 
     bool m_initialized = false;
     std::atomic<bool> m_playing{false};
@@ -73,18 +74,19 @@ private:
     std::atomic<bool> m_endOfStream{false};
     std::atomic<float> m_currentTime{0.0f};
     std::atomic<float> m_tempoMultiplier{1.0f};
-    float m_duration = 0.0f;
+    float m_activeTempoMultiplier = 1.0f;  // Currently applied tempo
+    std::atomic<bool> m_tempoProcessingInProgress{false};
+    std::atomic<float> m_tempoProcessingProgress{0.0f};
+    float m_duration = 0.0f;  // Always original duration
     uint32_t m_sampleRate = 0;
     uint32_t m_channelCount = 0;
-    uint64_t m_frameCount = 0;
-    std::atomic<uint64_t> m_playbackFrameIndex{0};
-    std::vector<float> m_audioBuffer;
+    uint64_t m_frameCount = 0;  // Always original frame count
+    uint64_t m_processedFrameCount = 0;  // Frame count of processed buffer
+    std::atomic<uint64_t> m_playbackFrameIndex{0};  // Index in processed buffer
+    std::vector<float> m_originalAudioBuffer;  // Original audio data
+    std::vector<float> m_processedAudioBuffer; // Tempo-adjusted audio
     std::string m_loadedFilePath;
 
-    // SoundTouch processing
-    std::unique_ptr<soundtouch::SoundTouch> m_soundTouch;
-    std::vector<float> m_tempoBuffer;
-    static constexpr size_t TEMPO_BUFFER_SIZE = 4096;
 
     std::unique_ptr<RtAudio> m_rtaudio;
     RtAudio::StreamParameters m_streamParams{};

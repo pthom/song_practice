@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <iostream>
 #include <stdexcept>
+#include <thread>
 
 #define DR_WAV_IMPLEMENTATION
 #include "dr_wav.h"
@@ -46,9 +47,6 @@ bool AudioEngine::initialize()
 
         m_streamOptions.flags = 0;  // use interleaved buffers (default)
         m_streamOptions.streamName = "SongPractice";
-
-        // Initialize SoundTouch
-        initializeSoundTouch();
 
         m_initialized = true;
         return true;
@@ -120,9 +118,9 @@ bool AudioEngine::loadAudioFile(const char* filePath)
     m_currentTime.store(0.0f);
     m_endOfStream.store(false);
     m_duration = (m_sampleRate > 0) ? static_cast<float>(m_frameCount) / static_cast<float>(m_sampleRate) : 0.0f;
-
-    // Reinitialize SoundTouch with correct audio parameters
-    initializeSoundTouch();
+    m_processedFrameCount = m_frameCount;  // Initially same as original
+    m_activeTempoMultiplier = 1.0f;
+    m_tempoMultiplier.store(1.0f);
 
     // Re-open stream for this audio format
     {
@@ -205,17 +203,20 @@ void AudioEngine::seek(float timeSeconds)
     if (!m_hasAudio || m_sampleRate == 0)
         return;
 
+    // Clamp to original duration
     const float clampedTime = std::max(0.0f, std::min(timeSeconds, m_duration));
-    const uint64_t targetFrame = static_cast<uint64_t>(clampedTime * static_cast<float>(m_sampleRate));
-    m_playbackFrameIndex.store(std::min<uint64_t>(targetFrame, m_frameCount));
+
+    // Calculate position in original audio
+    const uint64_t originalFramePos = static_cast<uint64_t>(clampedTime * static_cast<float>(m_sampleRate));
+
+    // Map to processed buffer position
+    // At 50% tempo: processed buffer is 2x longer, so multiply by (1/tempo)
+    const float tempoRatio = m_activeTempoMultiplier;
+    const uint64_t processedFramePos = static_cast<uint64_t>(originalFramePos / tempoRatio);
+
+    m_playbackFrameIndex.store(std::min<uint64_t>(processedFramePos, m_processedFrameCount));
     m_currentTime.store(clampedTime);
     m_endOfStream.store(false);
-
-    // Clear SoundTouch buffer to prevent audio artifacts from previous position
-    if (m_soundTouch)
-    {
-        m_soundTouch->clear();
-    }
 }
 
 void AudioEngine::seekBy(float delay)
@@ -281,7 +282,7 @@ uint64_t AudioEngine::getFrameCount() const
 
 const std::vector<float>& AudioEngine::getAudioData() const
 {
-    return m_audioBuffer;
+    return m_originalAudioBuffer;
 }
 
 bool AudioEngine::loadWavFile(const char* filePath)
@@ -310,7 +311,8 @@ bool AudioEngine::loadWavFile(const char* filePath)
 
     buffer.resize(static_cast<size_t>(framesRead) * channels);
 
-    m_audioBuffer = std::move(buffer);
+    m_originalAudioBuffer = buffer;
+    m_processedAudioBuffer = std::move(buffer);
     m_channelCount = channels;
     m_sampleRate = sampleRate;
     m_frameCount = framesRead;
@@ -344,7 +346,8 @@ bool AudioEngine::loadMp3File(const char* filePath)
 
     buffer.resize(static_cast<size_t>(framesRead) * channels);
 
-    m_audioBuffer = std::move(buffer);
+    m_originalAudioBuffer = buffer;
+    m_processedAudioBuffer = std::move(buffer);
     m_channelCount = channels;
     m_sampleRate = sampleRate;
     m_frameCount = framesRead;
@@ -354,16 +357,23 @@ bool AudioEngine::loadMp3File(const char* filePath)
 
 void AudioEngine::resetState()
 {
-    m_audioBuffer.clear();
-    m_audioBuffer.shrink_to_fit();
+    m_originalAudioBuffer.clear();
+    m_originalAudioBuffer.shrink_to_fit();
+    m_processedAudioBuffer.clear();
+    m_processedAudioBuffer.shrink_to_fit();
     m_channelCount = 0;
     m_sampleRate = 0;
     m_frameCount = 0;
+    m_processedFrameCount = 0;
     m_duration = 0.0f;
     m_currentTime.store(0.0f);
     m_hasAudio = false;
     m_loadedFilePath.clear();
     m_playbackFrameIndex.store(0);
+    m_activeTempoMultiplier = 1.0f;
+    m_tempoMultiplier.store(1.0f);
+    m_tempoProcessingInProgress.store(false);
+    m_tempoProcessingProgress.store(0.0f);
 }
 
 bool AudioEngine::ensureStreamReadyLocked()
@@ -448,12 +458,18 @@ void AudioEngine::closeStreamLocked()
 
 void AudioEngine::setTempoMultiplier(float multiplier)
 {
-    multiplier = std::clamp(multiplier, 0.25f, 4.0f);  // Limit to reasonable range
+    multiplier = std::clamp(multiplier, 0.25f, 4.0f);
+
+    // Check if tempo actually changed
+    if (std::abs(multiplier - m_activeTempoMultiplier) < 0.001f)
+        return;
+
     m_tempoMultiplier.store(multiplier);
 
-    if (m_soundTouch)
+    // Trigger background reprocessing
+    if (m_hasAudio && !m_originalAudioBuffer.empty())
     {
-        m_soundTouch->setTempo(multiplier);
+        reprocessAudioWithTempo(multiplier);
     }
 }
 
@@ -462,106 +478,113 @@ float AudioEngine::getTempoMultiplier() const
     return m_tempoMultiplier.load();
 }
 
-void AudioEngine::initializeSoundTouch()
+bool AudioEngine::isTempoProcessing() const
 {
-    m_soundTouch = std::make_unique<soundtouch::SoundTouch>();
-
-    if (m_hasAudio)
-    {
-        m_soundTouch->setSampleRate(m_sampleRate);
-        m_soundTouch->setChannels(m_channelCount);
-        m_soundTouch->setTempo(m_tempoMultiplier.load());
-
-        // Configure for high-quality processing across all tempo ranges
-        // Disable quick seek for better quality (uses more CPU but sounds better)
-        m_soundTouch->setSetting(SETTING_USE_QUICKSEEK, 0);
-
-        // Enable high-quality anti-aliasing filter
-        m_soundTouch->setSetting(SETTING_USE_AA_FILTER, 1);
-
-        // Optimized for extreme slowdowns (0.25x) while still good at normal speeds
-        // Longer sequences = better quality, especially for slow tempos
-        m_soundTouch->setSetting(SETTING_SEQUENCE_MS, 100);
-
-        // Larger seek window for better overlap matching
-        m_soundTouch->setSetting(SETTING_SEEKWINDOW_MS, 35);
-
-        // Increased overlap for smoother transitions
-        m_soundTouch->setSetting(SETTING_OVERLAP_MS, 24);
-    }
-
-    // Reserve buffer space
-    m_tempoBuffer.resize(TEMPO_BUFFER_SIZE * m_channelCount);
+    return m_tempoProcessingInProgress.load();
 }
 
-void AudioEngine::processTempo(const float* input, float* output, unsigned int frames)
+float AudioEngine::getTempoProcessingProgress() const
 {
-    if (!m_soundTouch || !m_hasAudio)
-    {
-        std::fill(output, output + frames * m_streamChannels, 0.0f);
-        return;
-    }
+    return m_tempoProcessingProgress.load();
+}
 
-    const uint64_t currentIndex = m_playbackFrameIndex.load();
-    const uint64_t framesRemaining = (currentIndex < m_frameCount) ? (m_frameCount - currentIndex) : 0;
+void AudioEngine::reprocessAudioWithTempo(float multiplier)
+{
+    // Launch background thread to reprocess audio
+    std::thread([this, multiplier]() {
+        m_tempoProcessingInProgress.store(true);
+        m_tempoProcessingProgress.store(0.0f);
 
-    if (framesRemaining == 0)
-    {
-        std::fill(output, output + frames * m_streamChannels, 0.0f);
-        m_playing.store(false);
-        m_endOfStream.store(true);
-        return;
-    }
+        std::cout << "AudioEngine: Starting tempo processing (" << multiplier << "x)..." << std::endl;
 
-    // Calculate how many input frames we need for the requested output frames
-    // Larger buffer provides better quality processing across all tempo ranges
-    const float tempoRatio = m_tempoMultiplier.load();
-    const unsigned int inputFramesNeeded = static_cast<unsigned int>(frames * tempoRatio) + 512;
-    const unsigned int inputFramesAvailable = static_cast<unsigned int>(std::min<uint64_t>(inputFramesNeeded, framesRemaining));
+        // Create temporary SoundTouch instance for this processing
+        soundtouch::SoundTouch st;
+        st.setSampleRate(m_sampleRate);
+        st.setChannels(m_channelCount);
+        st.setTempo(multiplier);
 
-    // Feed audio data to SoundTouch
-    const float* sourceData = input + (currentIndex * m_streamChannels);
-    m_soundTouch->putSamples(sourceData, inputFramesAvailable);
+        // High quality settings for offline processing
+        st.setSetting(SETTING_USE_QUICKSEEK, 0);
+        st.setSetting(SETTING_USE_AA_FILTER, 1);
+        st.setSetting(SETTING_SEQUENCE_MS, 100);
+        st.setSetting(SETTING_SEEKWINDOW_MS, 35);
+        st.setSetting(SETTING_OVERLAP_MS, 24);
 
-    // Try to receive processed samples
-    unsigned int outputSamples = 0;
-    unsigned int totalOutputSamples = 0;
+        // Calculate expected output size
+        const uint64_t originalFrameCount = m_originalAudioBuffer.size() / m_channelCount;
+        const size_t expectedFrames = static_cast<size_t>(originalFrameCount / multiplier);
 
-    while (totalOutputSamples < frames && (outputSamples = m_soundTouch->receiveSamples(
-        output + totalOutputSamples * m_streamChannels,
-        frames - totalOutputSamples)) > 0)
-    {
-        totalOutputSamples += outputSamples;
-    }
+        // Feed entire original audio in chunks for progress tracking
+        const size_t chunkSize = 44100; // 1 second chunks
+        std::vector<float> tempBuffer;
+        tempBuffer.reserve(expectedFrames * m_channelCount);
 
-    // If we're near the end and still need more samples, flush the pipeline
-    if (totalOutputSamples < frames && currentIndex + inputFramesAvailable >= m_frameCount)
-    {
-        m_soundTouch->flush();
-        while (totalOutputSamples < frames && (outputSamples = m_soundTouch->receiveSamples(
-            output + totalOutputSamples * m_streamChannels,
-            frames - totalOutputSamples)) > 0)
+        // Feed audio in chunks
+        size_t framesProcessed = 0;
+        while (framesProcessed < originalFrameCount)
         {
-            totalOutputSamples += outputSamples;
+            const size_t framesToProcess = std::min(chunkSize, static_cast<size_t>(originalFrameCount - framesProcessed));
+            const float* sourceData = m_originalAudioBuffer.data() + (framesProcessed * m_channelCount);
+            st.putSamples(sourceData, framesToProcess);
+            framesProcessed += framesToProcess;
+
+            // Update progress
+            m_tempoProcessingProgress.store(static_cast<float>(framesProcessed) / static_cast<float>(originalFrameCount) * 0.9f);
+
+            // Receive any available processed samples
+            std::vector<float> outputChunk(chunkSize * m_channelCount * 2); // Extra space for stretching
+            unsigned int receivedSamples;
+            while ((receivedSamples = st.receiveSamples(outputChunk.data(), chunkSize * 2)) > 0)
+            {
+                tempBuffer.insert(tempBuffer.end(),
+                                outputChunk.begin(),
+                                outputChunk.begin() + receivedSamples * m_channelCount);
+            }
         }
-    }
 
-    // Fill remaining buffer with silence if needed
-    if (totalOutputSamples < frames)
-    {
-        std::fill(output + totalOutputSamples * m_streamChannels,
-                 output + frames * m_streamChannels, 0.0f);
-    }
+        // Flush remaining samples
+        st.flush();
+        m_tempoProcessingProgress.store(0.95f);
 
-    // Update playback position based on input consumption
-    m_playbackFrameIndex.store(currentIndex + inputFramesAvailable);
+        std::vector<float> outputChunk(chunkSize * m_channelCount * 2);
+        unsigned int receivedSamples;
+        while ((receivedSamples = st.receiveSamples(outputChunk.data(), chunkSize * 2)) > 0)
+        {
+            tempBuffer.insert(tempBuffer.end(),
+                            outputChunk.begin(),
+                            outputChunk.begin() + receivedSamples * m_channelCount);
+        }
 
-    // Check for end of stream
-    if (currentIndex + inputFramesAvailable >= m_frameCount)
-    {
-        m_playing.store(false);
-        m_endOfStream.store(true);
-    }
+        // Atomically swap buffers and update metadata
+        {
+            std::lock_guard<std::mutex> lock(m_streamMutex);
+
+            // Get current position in ORIGINAL time
+            const float currentOriginalTime = m_currentTime.load();
+
+            // Update to new processed buffer
+            m_processedAudioBuffer = std::move(tempBuffer);
+            m_processedFrameCount = m_processedAudioBuffer.size() / m_channelCount;
+            m_activeTempoMultiplier = multiplier;
+
+            // Note: m_frameCount and m_duration remain unchanged (always refer to original audio)
+
+            // Map current position from original time to processed buffer position
+            // At 50% tempo: processed buffer is 2x longer, so divide by tempo
+            const uint64_t originalFramePos = static_cast<uint64_t>(currentOriginalTime * static_cast<float>(m_sampleRate));
+            const uint64_t processedFramePos = static_cast<uint64_t>(originalFramePos / multiplier);
+            m_playbackFrameIndex.store(std::min(processedFramePos, m_processedFrameCount));
+
+            // Current time stays the same (in original time)
+            m_currentTime.store(currentOriginalTime);
+        }
+
+        m_tempoProcessingProgress.store(1.0f);
+        m_tempoProcessingInProgress.store(false);
+
+        std::cout << "AudioEngine: Tempo processing complete (processed: " << m_processedFrameCount
+                  << " frames, original: " << m_frameCount << " frames)" << std::endl;
+    }).detach();
 }
 
 int AudioEngine::processAudio(float* output, unsigned int frames, RtAudioStreamStatus status)
@@ -577,40 +600,33 @@ int AudioEngine::processAudio(float* output, unsigned int frames, RtAudioStreamS
         return 0;
     }
 
-    const float currentTempo = m_tempoMultiplier.load();
     const uint64_t currentIndex = m_playbackFrameIndex.load();
+    const uint64_t framesRemaining = (currentIndex < m_processedFrameCount) ? (m_processedFrameCount - currentIndex) : 0;
+    const unsigned int framesToCopy = static_cast<unsigned int>(std::min<uint64_t>(frames, framesRemaining));
 
-    // Check if we need tempo processing
-    if (std::abs(currentTempo - 1.0f) < 0.001f || !m_soundTouch)
+    if (framesToCopy > 0)
     {
-        // No tempo adjustment needed, use direct copy
-        const uint64_t framesRemaining = (currentIndex < m_frameCount) ? (m_frameCount - currentIndex) : 0;
-        const unsigned int framesToCopy = static_cast<unsigned int>(std::min<uint64_t>(frames, framesRemaining));
+        const float* source = m_processedAudioBuffer.data() + (currentIndex * m_streamChannels);
+        std::copy(source, source + framesToCopy * m_streamChannels, output);
+    }
 
-        if (framesToCopy > 0)
-        {
-            const float* source = m_audioBuffer.data() + (currentIndex * m_streamChannels);
-            std::copy(source, source + framesToCopy * m_streamChannels, output);
-        }
-
-        if (framesToCopy < frames)
-        {
-            std::fill(output + framesToCopy * m_streamChannels, output + frames * m_streamChannels, 0.0f);
-            m_playing.store(false);
-            m_endOfStream.store(true);
-        }
-        else
-        {
-            m_playbackFrameIndex.store(currentIndex + framesToCopy);
-        }
+    if (framesToCopy < frames)
+    {
+        std::fill(output + framesToCopy * m_streamChannels, output + frames * m_streamChannels, 0.0f);
+        m_playing.store(false);
+        m_endOfStream.store(true);
     }
     else
     {
-        // Use SoundTouch for tempo processing
-        processTempo(m_audioBuffer.data(), output, frames);
+        m_playbackFrameIndex.store(currentIndex + framesToCopy);
     }
 
-    const float time = static_cast<float>(m_playbackFrameIndex.load()) / static_cast<float>(m_sampleRate);
+    // Convert processed buffer position back to original time
+    // At 50% tempo: processed buffer is 2x longer, so multiply by tempo to get original position
+    const float tempoRatio = m_activeTempoMultiplier;
+    const uint64_t processedPos = m_playbackFrameIndex.load();
+    const uint64_t originalPos = static_cast<uint64_t>(processedPos * tempoRatio);
+    const float time = static_cast<float>(originalPos) / static_cast<float>(m_sampleRate);
     m_currentTime.store(time);
 
     return 0;
