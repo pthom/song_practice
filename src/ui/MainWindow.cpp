@@ -37,6 +37,7 @@ bool showControlButton(const char* icon, const char* tooltip, bool autorepeat = 
 MainWindow::MainWindow()
 {
     m_audioEngine.initialize();
+    m_pendingTempoMultiplier = m_appState.tempoMultiplier;
     loadSettings();
 }
 
@@ -58,6 +59,7 @@ void MainWindow::loadSettings()
                 m_waveformDirty = true;
                 // Restore tempo setting
                 m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
+                m_pendingTempoMultiplier = m_appState.tempoMultiplier;
                 // Seek to the saved play position
                 if (m_appState.playPosition > 0.0f)
                 {
@@ -114,6 +116,7 @@ void MainWindow::loadTrackSettings()
                     m_waveformDirty = true;
                     // Restore tempo setting
                     m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
+                    m_pendingTempoMultiplier = m_appState.tempoMultiplier;
                     // Seek to the saved play position
                     if (m_appState.playPosition > 0.0f)
                     {
@@ -292,6 +295,7 @@ void MainWindow::openAudioFile()
                 m_waveformDirty = true;
                 // Set tempo to current app state (may be default 1.0 or previously set value)
                 m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
+                m_pendingTempoMultiplier = m_appState.tempoMultiplier;
                 HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded audio file: %s",
                               Utils::getFileName(filePath).c_str());
             }
@@ -321,6 +325,11 @@ void MainWindow::renderAudioControls()
 
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(kTransportSpacing, 10.0f));
 
+    // Go to Start button
+    if (showControlButton(ICON_FA_BACKWARD_STEP "##song_start", "Go to Start"))
+        m_audioEngine.seek(0.0f);
+
+    ImGui::SameLine();
     if (showControlButton(ICON_FA_BACKWARD, "Rewind 1 second", true))
         m_audioEngine.seekBy(-kSeekStep);
 
@@ -362,6 +371,14 @@ void MainWindow::renderAudioControls()
                 Utils::formatTime(m_audioEngine.getCurrentTime()).c_str(),
                 Utils::formatTime(m_audioEngine.getDuration()).c_str());
     ImGui::PopStyleColor();
+
+    // Display active tempo ratio
+    const float activeTempo = m_audioEngine.getTempoMultiplier();
+    if (hasAudio && std::abs(activeTempo - 1.0f) > 0.001f)
+    {
+        ImGui::SameLine();
+        ImGui::TextColored(ImVec4(0.4f, 0.8f, 1.0f, 1.0f), " @ %.0f%%", activeTempo * 100.0f);
+    }
 }
 
 void MainWindow::renderTempoControls()
@@ -375,19 +392,36 @@ void MainWindow::renderTempoControls()
     if (!hasAudio || isProcessing)
         ImGui::BeginDisabled();
 
-    // Tempo slider with percentage display
-    float tempoPercent = m_appState.tempoMultiplier * 100.0f;
+    // Tempo slider with percentage display (pending value)
+    float tempoPercent = m_pendingTempoMultiplier * 100.0f;
     ImGui::SetNextItemWidth(HelloImGui::EmSize(20.f));
     if (ImGui::SliderFloat("Tempo", &tempoPercent, 25.0f, 200.0f, "%.0f%%"))
     {
-        m_appState.tempoMultiplier = tempoPercent / 100.0f;
+        m_pendingTempoMultiplier = tempoPercent / 100.0f;
+    }
+
+    // Apply button - only enabled if tempo changed
+    ImGui::SameLine();
+    const float currentActiveTempo = m_audioEngine.getTempoMultiplier();
+    const bool tempoChanged = std::abs(m_pendingTempoMultiplier - currentActiveTempo) > 0.001f;
+
+    if (!tempoChanged)
+        ImGui::BeginDisabled();
+
+    if (ImGui::Button("Apply"))
+    {
+        m_appState.tempoMultiplier = m_pendingTempoMultiplier;
         m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
     }
+
+    if (!tempoChanged)
+        ImGui::EndDisabled();
 
     // Reset button
     ImGui::SameLine();
     if (ImGui::Button("Reset"))
     {
+        m_pendingTempoMultiplier = 1.0f;
         m_appState.tempoMultiplier = 1.0f;
         m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
     }

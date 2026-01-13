@@ -65,4 +65,5 @@ private:
     SettingsManager m_settingsManager;
     bool m_waveformDirty = false;
     bool m_wasTempoProcessing = false;
+    float m_pendingTempoMultiplier = 1.0f;  // Tempo value in slider (not yet applied)
 };
