@@ -377,6 +377,7 @@ void MainWindow::renderTempoControls()
 
     // Tempo slider with percentage display
     float tempoPercent = m_appState.tempoMultiplier * 100.0f;
+    ImGui::SetNextItemWidth(HelloImGui::EmSize(20.f));
     if (ImGui::SliderFloat("Tempo", &tempoPercent, 25.0f, 200.0f, "%.0f%%"))
     {
         m_appState.tempoMultiplier = tempoPercent / 100.0f;
@@ -468,8 +469,7 @@ void MainWindow::renderMarkerControls()
         return;
 
     ImGui::Spacing();
-    ImGui::Separator();
-    ImGui::Text("Markers:");
+    ImGui::SeparatorText("Markers:");
 
     const bool hasMarkers = !m_appState.markers.empty();
     if (!hasMarkers)
