@@ -533,9 +533,16 @@ void MainWindow::renderMarkerControls()
     {
         ImGui::PushID(i);
         Marker& marker = m_appState.markers[i];
-        ImGui::SetNextItemWidth(HelloImGui::EmSize(5.f));
-        ImGui::InputText("Name", &marker.name);
-        ImGui::SameLine(HelloImGui::EmSize(10.f));
+
+        ImGui::Text("Time: %05.2f s", marker.timeSeconds);
+
+        ImGui::SameLine();
+        ImGui::Text("Name");
+        ImGui::SameLine();
+        ImGui::SetNextItemWidth(HelloImGui::EmSize(10.f));
+        ImGui::InputText("##Name", &marker.name);
+
+        ImGui::SameLine();
         if (ImGui::Button("Delete Marker"))
             markerToDelete = i;
         ImGui::PopID();
