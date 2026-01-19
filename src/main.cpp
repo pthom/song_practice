@@ -27,6 +27,9 @@ int main(int argc, char **argv)
     // Setup callbacks using HelloImGui utilities
     runnerParams.callbacks.defaultIconFont = HelloImGui::DefaultIconFont::FontAwesome6;
 
+    runnerParams.iniFolderType = HelloImGui::IniFolderType::AppUserConfigFolder;
+    runnerParams.iniFilename = "SongPractice/settings.ini";
+
     runnerParams.callbacks.ShowGui = [&mainWindow]() {
         mainWindow.showGui();
     };
