@@ -51,7 +51,8 @@ bool WaveformRenderer::draw(const char* plotId,
                             const ImVec2& size,
                             float currentTimeSeconds,
                             float& outSeekTimeSeconds,
-                            const std::vector<MarkerView>& markers) const
+                            const std::vector<MarkerView>& markers,
+                            int currentMarkerIndex) const
 {
     outSeekTimeSeconds = currentTimeSeconds;
 
@@ -94,10 +95,15 @@ bool WaveformRenderer::draw(const char* plotId,
             }
         }
 
-        for (const auto& marker : markers)
+        for (size_t i = 0; i < markers.size(); ++i)
         {
+            const auto& marker = markers[i];
             double markerX = marker.timeSeconds;
-            const ImVec4 color = ImVec4(0.6f, 0.8f, 1.0f, 1.0f);
+            // Blue for current marker, grayish for others
+            const bool isCurrent = (static_cast<int>(i) == currentMarkerIndex);
+            const ImVec4 color = isCurrent
+                ? ImVec4(0.2f, 0.5f, 1.0f, 1.0f)   // Blue for current
+                : ImVec4(0.6f, 0.6f, 0.65f, 0.8f);  // Grayish for others
             const std::string id = "Marker##" + marker.label;
             ImPlot::TagX(markerX, color, "%s", marker.label.c_str());
             ImPlot::DragLineX(ImGui::GetID(id.c_str()),

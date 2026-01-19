@@ -542,9 +542,12 @@ void MainWindow::renderMarkerControls()
         return;
     }
 
-    ImGui::BeginChild("Markers"); // HelloImGui::EmToVec2(0, 20));
+    ImGui::BeginChild("Markers");
     int markerToDelete = -1;
     int markersPerColumn = 6;
+
+    // Calculate current marker index
+    int currentIdx = currentMarkerIndex();
 
     static ImGuiTableFlags flags = ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_ContextMenuInBody;
     int nbColumns = (m_appState.markers.size() + markersPerColumn - 1) / markersPerColumn;
@@ -558,6 +561,11 @@ void MainWindow::renderMarkerControls()
         ImGui::PushID(i);
         Marker& marker = m_appState.markers[i];
 
+        // Highlight current marker in blue
+        bool isCurrentMarker = (i == currentIdx);
+        if (isCurrentMarker)
+            ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 0.5f, 1.0f, 1.0f));
+
         ImGui::Text("Time: %05.2f s", marker.timeSeconds);
 
         ImGui::SameLine();
@@ -569,6 +577,9 @@ void MainWindow::renderMarkerControls()
         ImGui::SameLine();
         if (ImGui::Button("Delete Marker"))
             markerToDelete = i;
+
+        if (isCurrentMarker)
+            ImGui::PopStyleColor();
 
         ImGui::PopID();
 
@@ -589,6 +600,8 @@ void MainWindow::renderWaveformArea()
     {
         ImPlot::SetNextAxesLimits(0.0, m_audioEngine.getDuration(), -1.0, 1.0, ImGuiCond_Once);
         float seekTime = 0.0f;
+
+        // Build marker views
         std::vector<MarkerView> markerViews;
         markerViews.reserve(m_appState.markers.size());
         for (int i = 0; i < static_cast<int>(m_appState.markers.size()); ++i)
@@ -599,11 +612,15 @@ void MainWindow::renderWaveformArea()
             markerViews.push_back(std::move(mv));
         }
 
+        // Calculate current marker index once
+        int currentIdx = currentMarkerIndex();
+
         if (m_waveformRenderer.draw("WaveformPlot",
                                      ImVec2(-1, -1),
                                      m_audioEngine.getCurrentTime(),
                                      seekTime,
-                                     markerViews))
+                                     markerViews,
+                                     currentIdx))
         {
             m_audioEngine.seek(seekTime);
         }

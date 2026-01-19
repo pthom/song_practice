@@ -25,7 +25,8 @@ public:
               const ImVec2& size,
               float currentTimeSeconds,
               float& outSeekTimeSeconds,
-              const std::vector<MarkerView>& markers) const;
+              const std::vector<MarkerView>& markers,
+              int currentMarkerIndex = -1) const;
 
 private:
     struct ChannelEnvelope
