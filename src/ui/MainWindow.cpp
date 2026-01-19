@@ -536,11 +536,25 @@ void MainWindow::renderMarkerControls()
         sortMarkers();
     }
 
+    if (!hasMarkers)
+    {
+        ImGui::TextDisabled(" No markers defined. ");
+        return;
+    }
 
     ImGui::BeginChild("Markers"); // HelloImGui::EmToVec2(0, 20));
     int markerToDelete = -1;
+    int markersPerColumn = 6;
+
+    static ImGuiTableFlags flags = ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_ContextMenuInBody;
+    int nbColumns = (m_appState.markers.size() + markersPerColumn - 1) / markersPerColumn;
+    ImGui::BeginTable("Markers", nbColumns, flags);
+    ImGui::TableNextRow();
     for (int i = 0; i < m_appState.markers.size(); ++i)
     {
+        if (i % markersPerColumn == 0)
+            ImGui::TableNextColumn();
+
         ImGui::PushID(i);
         Marker& marker = m_appState.markers[i];
 
@@ -555,8 +569,11 @@ void MainWindow::renderMarkerControls()
         ImGui::SameLine();
         if (ImGui::Button("Delete Marker"))
             markerToDelete = i;
+
         ImGui::PopID();
+
     }
+    ImGui::EndTable();
     ImGui::EndChild();
     if (markerToDelete >= 0)
         m_appState.markers.erase(m_appState.markers.begin() + markerToDelete);
