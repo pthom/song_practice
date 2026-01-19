@@ -221,6 +221,20 @@ void MainWindow::showMenus()
     // Add our custom File menu
     if (ImGui::BeginMenu("File"))
     {
+        if (ImGui::MenuItem("New", "Ctrl+N"))
+        {
+            auto selection = pfd::open_file("Select Audio File for New Session",
+                                           "",
+                                           {"Audio Files", "*.wav *.mp3 *.flac *.ogg *.m4a *.aac",
+                                            "All Files", "*"},
+                                           pfd::opt::none).result();
+            if (!selection.empty())
+            {
+                const std::string& filePath = selection[0];
+                newSessionWithFile(filePath);
+            }
+        }
+
         if (ImGui::MenuItem("Open Audio File...", "Ctrl+O"))
         {
             openAudioFile();
@@ -813,4 +827,37 @@ void MainWindow::saveUserPrefs()
     {
         HelloImGui::Log(HelloImGui::LogLevel::Warning, "Failed to save recent track settings: %s", e.what());
     }
+}
+
+void MainWindow::newSessionWithFile(const std::string& filePath)
+{
+    // Try to load the audio file first
+    if (!Utils::isAudioFile(filePath))
+    {
+        HelloImGui::Log(HelloImGui::LogLevel::Warning, "Selected file is not a supported audio file: %s", Utils::getFileName(filePath).c_str());
+        return;
+    }
+    const std::string extension = Utils::getFileExtension(filePath);
+    if (extension != "wav" && extension != "mp3")
+    {
+        HelloImGui::Log(HelloImGui::LogLevel::Warning, "Currently supported formats: wav, mp3 (got: %s)", extension.c_str());
+        return;
+    }
+    if (!m_audioEngine.loadAudioFile(filePath.c_str()))
+    {
+        HelloImGui::Log(HelloImGui::LogLevel::Error, "Failed to load audio file: %s", Utils::getFileName(filePath).c_str());
+        return;
+    }
+
+    // Only clear state if loading succeeded
+    m_waveformRenderer.clear();
+    m_appState.soundFilePath = filePath;
+    m_appState.playPosition = 0.0f;
+    m_appState.tempoMultiplier = 1.0f;
+    m_pendingTempoMultiplier = 1.0f;
+    m_appState.markers.clear();
+    m_waveformDirty = true;
+    m_audioEngine.setTempoMultiplier(1.0f);
+    m_audioEngine.seek(0.0f);
+    HelloImGui::Log(HelloImGui::LogLevel::Info, "Started new session with file: %s", Utils::getFileName(filePath).c_str());
 }

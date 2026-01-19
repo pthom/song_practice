@@ -33,6 +33,9 @@ public:
     void loadUserPrefs();
     void saveUserPrefs();
 
+    // New session: load new audio file and clear markers/state if successful
+    void newSessionWithFile(const std::string& filePath);
+
     void renderAudioInfo();
 
     // Main GUI functions for HelloImGui
