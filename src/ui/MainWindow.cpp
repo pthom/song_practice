@@ -8,12 +8,28 @@
 #include "hello_imgui/icons_font_awesome_6.h"
 #include <algorithm>
 #include <filesystem>
+#include <unordered_set>
+#include "nlohmann/json.hpp"
 
 namespace
 {
     constexpr float kSeekStep = 1.0f;
     constexpr ImVec2 kTransportButtonSize = ImVec2(40.0f, 40.0f);
     constexpr float kTransportSpacing = 14.0f;
+
+    std::string normalizePath(const std::string& path)
+    {
+        if (path.empty())
+            return {};
+        try
+        {
+            return std::filesystem::path(path).lexically_normal().string();
+        }
+        catch (...)
+        {
+            return path;
+        }
+    }
 }
 
 
@@ -101,48 +117,7 @@ void MainWindow::loadTrackSettings()
     if (!selection.empty())
     {
         const std::string settingsPath = selection[0];
-        ApplicationState tempState;
-
-        if (m_settingsManager.loadTrackSettings(settingsPath, tempState))
-        {
-            // Successfully loaded settings
-            m_appState = tempState;
-
-            // Try to load the audio file if specified
-            if (!m_appState.soundFilePath.empty())
-            {
-                if (m_audioEngine.loadAudioFile(m_appState.soundFilePath.c_str()))
-                {
-                    m_waveformDirty = true;
-                    // Restore tempo setting
-                    m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
-                    m_pendingTempoMultiplier = m_appState.tempoMultiplier;
-                    // Seek to the saved play position
-                    if (m_appState.playPosition > 0.0f)
-                    {
-                        m_audioEngine.seek(m_appState.playPosition);
-                    }
-                    HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded track settings and audio file: %s",
-                                  Utils::getFileName(m_appState.soundFilePath).c_str());
-                }
-                else
-                {
-                    HelloImGui::Log(HelloImGui::LogLevel::Warning,
-                                  "Loaded track settings but couldn't load audio file: %s",
-                                  Utils::getFileName(m_appState.soundFilePath).c_str());
-                }
-            }
-            else
-            {
-                HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded track settings: %s",
-                              Utils::getFileName(settingsPath).c_str());
-            }
-        }
-        else
-        {
-            HelloImGui::Log(HelloImGui::LogLevel::Error, "Failed to load track settings: %s",
-                          Utils::getFileName(settingsPath).c_str());
-        }
+        loadTrackSettingsFromPath(settingsPath);
     }
 }
 
@@ -184,6 +159,7 @@ void MainWindow::saveTrackSettings()
         {
             HelloImGui::Log(HelloImGui::LogLevel::Info, "Saved track settings: %s",
                           Utils::getFileName(settingsPath).c_str());
+            addRecentSettingsPath(settingsPath);
         }
         else
         {
@@ -255,6 +231,26 @@ void MainWindow::showMenus()
         if (ImGui::MenuItem("Load Track Settings..."))
         {
             loadTrackSettings();
+        }
+
+        // Recent settings list
+        if (!m_recentTrackSettings.empty())
+        {
+            ImGui::Separator();
+            if (ImGui::BeginMenu("Recent Track Settings"))
+            {
+                // iterate newest-first
+                for (int i = static_cast<int>(m_recentTrackSettings.size()) - 1; i >= 0; --i)
+                {
+                    const std::string& path = m_recentTrackSettings[static_cast<size_t>(i)];
+                    const std::string label = Utils::getFileName(path);
+                    if (ImGui::MenuItem(label.c_str()))
+                    {
+                        loadTrackSettingsFromPath(path);
+                    }
+                }
+                ImGui::EndMenu();
+            }
         }
 
         if (ImGui::MenuItem("Save Track Settings..."))
@@ -694,5 +690,127 @@ void MainWindow::handleKeyboardShortcuts()
         {
             seekToNextMarker();
         }
+    }
+}
+
+bool MainWindow::loadTrackSettingsFromPath(const std::string& settingsPath)
+{
+    ApplicationState tempState;
+    if (!m_settingsManager.loadTrackSettings(settingsPath, tempState))
+    {
+        HelloImGui::Log(HelloImGui::LogLevel::Error, "Failed to load track settings: %s",
+                      Utils::getFileName(settingsPath).c_str());
+        return false;
+    }
+
+    // If the settings reference an audio file, ensure it loads before committing the state
+    if (!tempState.soundFilePath.empty())
+    {
+        if (!m_audioEngine.loadAudioFile(tempState.soundFilePath.c_str()))
+        {
+            HelloImGui::Log(HelloImGui::LogLevel::Warning,
+                          "Loaded settings but couldn't load audio file: %s",
+                          Utils::getFileName(tempState.soundFilePath).c_str());
+            return false;
+        }
+    }
+
+    // Commit state only after successful settings (and audio, if any) load
+    m_appState = tempState;
+
+    if (!m_appState.soundFilePath.empty())
+    {
+        m_waveformDirty = true;
+        m_audioEngine.setTempoMultiplier(m_appState.tempoMultiplier);
+        m_pendingTempoMultiplier = m_appState.tempoMultiplier;
+        if (m_appState.playPosition > 0.0f)
+            m_audioEngine.seek(m_appState.playPosition);
+        HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded track settings and audio file: %s",
+                      Utils::getFileName(m_appState.soundFilePath).c_str());
+    }
+    else
+    {
+        HelloImGui::Log(HelloImGui::LogLevel::Info, "Loaded track settings: %s",
+                      Utils::getFileName(settingsPath).c_str());
+    }
+
+    addRecentSettingsPath(settingsPath);
+    return true;
+}
+
+
+void MainWindow::addRecentSettingsPath(const std::string& settingsPath)
+{
+    const std::string normalized = normalizePath(settingsPath);
+    if (normalized.empty())
+        return;
+
+    // remove if already present
+    m_recentTrackSettings.erase(
+        std::remove(m_recentTrackSettings.begin(), m_recentTrackSettings.end(), normalized),
+        m_recentTrackSettings.end());
+
+    m_recentTrackSettings.push_back(normalized);
+
+    // keep only last 15
+    constexpr size_t kMaxRecent = 15;
+    if (m_recentTrackSettings.size() > kMaxRecent)
+    {
+        m_recentTrackSettings.erase(m_recentTrackSettings.begin(),
+                                    m_recentTrackSettings.begin() + (m_recentTrackSettings.size() - kMaxRecent));
+    }
+
+    saveUserPrefs();
+}
+
+void MainWindow::loadUserPrefs()
+{
+    std::string recentJson = HelloImGui::LoadUserPref("recent_track_settings");
+    if (recentJson.empty())
+        return;
+
+    try
+    {
+        nlohmann::json j = nlohmann::json::parse(recentJson);
+        if (j.is_array())
+        {
+            std::vector<std::string> loaded;
+            loaded.reserve(j.size());
+            for (const auto& item : j)
+            {
+                if (item.is_string())
+                    loaded.push_back(normalizePath(item.get<std::string>()));
+            }
+
+            // dedupe while preserving order (newest assumed last)
+            std::unordered_set<std::string> seen;
+            m_recentTrackSettings.clear();
+            for (const auto& path : loaded)
+            {
+                if (path.empty())
+                    continue;
+                if (seen.insert(path).second)
+                    m_recentTrackSettings.push_back(path);
+            }
+        }
+    }
+    catch (const std::exception& e)
+    {
+        HelloImGui::Log(HelloImGui::LogLevel::Warning, "Failed to parse recent track settings: %s", e.what());
+    }
+}
+
+void MainWindow::saveUserPrefs()
+{
+    try
+    {
+        nlohmann::json j = nlohmann::json::array();
+        for (const auto& path : m_recentTrackSettings)
+            j.push_back(path);
+        HelloImGui::SaveUserPref("recent_track_settings", j.dump());
+    }
+    catch (const std::exception& e)
+    {
+        HelloImGui::Log(HelloImGui::LogLevel::Warning, "Failed to save recent track settings: %s", e.what());
     }
 }

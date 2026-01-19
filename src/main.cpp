@@ -30,6 +30,12 @@ int main(int argc, char **argv)
     runnerParams.callbacks.ShowGui = [&mainWindow]() {
         mainWindow.showGui();
     };
+    runnerParams.callbacks.PostInit = [&mainWindow]() {
+        mainWindow.loadUserPrefs();
+    };
+    runnerParams.callbacks.BeforeExit = [&mainWindow]() {
+        mainWindow.saveUserPrefs();
+    };
     runnerParams.imGuiWindowParams.showMenu_View = false;
     runnerParams.imGuiWindowParams.showMenu_App_Quit = false;
     runnerParams.callbacks.ShowMenus = [&mainWindow]() {

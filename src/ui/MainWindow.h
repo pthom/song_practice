@@ -29,6 +29,10 @@ public:
     void loadSettings();
     void saveSettings();
 
+    // App-level user prefs (recent settings list)
+    void loadUserPrefs();
+    void saveUserPrefs();
+
     void renderAudioInfo();
 
     // Main GUI functions for HelloImGui
@@ -54,6 +58,9 @@ private:
     int currentMarkerIndex() const;
     void sortMarkers();
 
+    bool loadTrackSettingsFromPath(const std::string& settingsPath);
+    void addRecentSettingsPath(const std::string& settingsPath);
+
     void seekToPreviousMarker();
 
     void seekToNextMarker();
@@ -66,4 +73,5 @@ private:
     bool m_waveformDirty = false;
     bool m_wasTempoProcessing = false;
     float m_pendingTempoMultiplier = 1.0f;  // Tempo value in slider (not yet applied)
+    std::vector<std::string> m_recentTrackSettings;
 };
