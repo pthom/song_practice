@@ -4,6 +4,7 @@ project(SongPractice)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(FETCHCONTENT_QUIET OFF)
 include(FetchContent)
 
 set(BUILD_SHARED_LIBS OFF)
@@ -35,6 +36,7 @@ FetchContent_Declare(
     dr_libs
     GIT_REPOSITORY https://github.com/mackron/dr_libs.git
     GIT_TAG master
+    GIT_PROGRESS TRUE
     EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(dr_libs)
@@ -44,6 +46,7 @@ FetchContent_Declare(
     nlohmann_json
     GIT_REPOSITORY https://github.com/nlohmann/json.git
     GIT_TAG v3.11.3
+    GIT_PROGRESS TRUE
     EXCLUDE_FROM_ALL
 )
 FetchContent_MakeAvailable(nlohmann_json)
@@ -52,6 +55,7 @@ FetchContent_MakeAvailable(nlohmann_json)
 FetchContent_Declare(
     soundtouch
     GIT_REPOSITORY https://codeberg.org/soundtouch/soundtouch.git
+    GIT_PROGRESS TRUE
     GIT_TAG 2.4.0
 )
 FetchContent_MakeAvailable(soundtouch)
