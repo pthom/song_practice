@@ -85,13 +85,13 @@ bool WaveformRenderer::draw(const char* plotId,
                 const std::string label = (m_channelCount > 1)
                                               ? "Channel " + std::to_string(channel + 1)
                                               : "Waveform";
-                ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(100, 180, 255, 255));
+                //ImPlot::PushStyleColor(ImPlotCol_Line, IM_COL32(100, 180, 255, 255));
                 ImPlot::PlotShaded(label.c_str(),
                                    level->times.data(),
                                    envelope.minValues.data(),
                                    envelope.maxValues.data(),
                                    static_cast<int>(level->times.size()));
-                ImPlot::PopStyleColor();
+                //ImPlot::PopStyleColor();
             }
         }
 

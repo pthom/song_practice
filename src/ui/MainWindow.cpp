@@ -213,6 +213,8 @@ void MainWindow::showGui()
     renderTempoControls();
     renderMarkerControls();
 
+    HelloImGui::LogGui();
+
     m_appState.playPosition = m_audioEngine.getCurrentTime();
 }
 
@@ -542,14 +544,15 @@ void MainWindow::renderMarkerControls()
         return;
     }
 
-    ImGui::BeginChild("Markers");
+
+    ImGui::BeginChild("Markers", HelloImGui::EmToVec2(0.f, 10.5f), 0, ImGuiWindowFlags_HorizontalScrollbar);
     int markerToDelete = -1;
     int markersPerColumn = 6;
 
     // Calculate current marker index
     int currentIdx = currentMarkerIndex();
 
-    static ImGuiTableFlags flags = ImGuiTableFlags_SizingStretchSame | ImGuiTableFlags_Resizable | ImGuiTableFlags_BordersOuter | ImGuiTableFlags_BordersV | ImGuiTableFlags_ContextMenuInBody;
+    static ImGuiTableFlags flags = ImGuiTableFlags_SizingFixedFit;
     int nbColumns = (m_appState.markers.size() + markersPerColumn - 1) / markersPerColumn;
     ImGui::BeginTable("Markers", nbColumns, flags);
     ImGui::TableNextRow();
@@ -566,17 +569,23 @@ void MainWindow::renderMarkerControls()
         if (isCurrentMarker)
             ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.2f, 0.5f, 1.0f, 1.0f));
 
-        ImGui::Text("Time: %05.2f s", marker.timeSeconds);
+        ImGui::Text("%05.2f s", marker.timeSeconds);
 
         ImGui::SameLine();
-        ImGui::Text("Name");
-        ImGui::SameLine();
-        ImGui::SetNextItemWidth(HelloImGui::EmSize(10.f));
+        //ImGui::Text("Name");
+        //ImGui::SameLine();
+        ImGui::SetNextItemWidth(HelloImGui::EmSize(6.f));
         ImGui::InputText("##Name", &marker.name);
 
         ImGui::SameLine();
-        if (ImGui::Button("Delete Marker"))
+        if (ImGui::Button(" " ICON_FA_I_CURSOR " ##Marker"))
+            m_audioEngine.seek(marker.timeSeconds);
+
+        ImGui::SameLine();
+        bool isShiftDown = ImGui::IsKeyDown(ImGuiKey_LeftShift) || ImGui::IsKeyDown(ImGuiKey_RightShift);
+        if (ImGui::Button("Del") && isShiftDown)
             markerToDelete = i;
+        ImGui::SetItemTooltip("Press while holding Shift to delete");
 
         if (isCurrentMarker)
             ImGui::PopStyleColor();
