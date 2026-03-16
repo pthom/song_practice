@@ -45,6 +45,12 @@ bool AudioEngine::initialize()
         m_streamParams.nChannels = 2;
         m_streamParams.firstChannel = 0;
 
+        // Query device preferred sample rate
+        RtAudio::DeviceInfo info = m_rtaudio->getDeviceInfo(static_cast<unsigned int>(m_defaultDeviceId));
+        m_deviceSampleRate = info.preferredSampleRate;
+        if (m_deviceSampleRate == 0)
+            m_deviceSampleRate = 44100;
+
         m_streamOptions.flags = 0;  // use interleaved buffers (default)
         m_streamOptions.streamName = "SongPractice";
 
@@ -118,6 +124,16 @@ bool AudioEngine::loadAudioFile(const char* filePath)
     m_currentTime.store(0.0f);
     m_endOfStream.store(false);
     m_duration = (m_sampleRate > 0) ? static_cast<float>(m_frameCount) / static_cast<float>(m_sampleRate) : 0.0f;
+
+    // Resample to device sample rate if needed
+    if (m_deviceSampleRate > 0 && m_sampleRate != m_deviceSampleRate)
+    {
+        std::cout << "AudioEngine: Resampling from " << m_sampleRate << " Hz to " << m_deviceSampleRate << " Hz" << std::endl;
+        resampleBuffer(m_originalAudioBuffer, m_channelCount, m_sampleRate, m_deviceSampleRate, m_frameCount);
+        m_processedAudioBuffer = m_originalAudioBuffer;
+        m_sampleRate = m_deviceSampleRate;
+    }
+
     m_processedFrameCount = m_frameCount;  // Initially same as original
     m_activeTempoMultiplier = 1.0f;
     m_tempoMultiplier.store(1.0f);
@@ -585,6 +601,35 @@ void AudioEngine::reprocessAudioWithTempo(float multiplier)
         std::cout << "AudioEngine: Tempo processing complete (processed: " << m_processedFrameCount
                   << " frames, original: " << m_frameCount << " frames)" << std::endl;
     }).detach();
+}
+
+void AudioEngine::resampleBuffer(std::vector<float>& buffer, uint32_t channels,
+                                  uint32_t srcRate, uint32_t dstRate, uint64_t& frameCount)
+{
+    if (srcRate == dstRate || srcRate == 0 || dstRate == 0 || frameCount == 0)
+        return;
+
+    const double ratio = static_cast<double>(dstRate) / static_cast<double>(srcRate);
+    const uint64_t newFrameCount = static_cast<uint64_t>(frameCount * ratio);
+    std::vector<float> resampled(newFrameCount * channels);
+
+    for (uint64_t i = 0; i < newFrameCount; ++i)
+    {
+        const double srcPos = static_cast<double>(i) / ratio;
+        const uint64_t idx0 = static_cast<uint64_t>(srcPos);
+        const uint64_t idx1 = std::min(idx0 + 1, frameCount - 1);
+        const float frac = static_cast<float>(srcPos - static_cast<double>(idx0));
+
+        for (uint32_t ch = 0; ch < channels; ++ch)
+        {
+            const float s0 = buffer[idx0 * channels + ch];
+            const float s1 = buffer[idx1 * channels + ch];
+            resampled[i * channels + ch] = s0 + frac * (s1 - s0);
+        }
+    }
+
+    buffer = std::move(resampled);
+    frameCount = newFrameCount;
 }
 
 int AudioEngine::processAudio(float* output, unsigned int frames, RtAudioStreamStatus status)

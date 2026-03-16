@@ -67,6 +67,8 @@ private:
                              void* userData);
 
     void reprocessAudioWithTempo(float multiplier);
+    void resampleBuffer(std::vector<float>& buffer, uint32_t channels,
+                        uint32_t srcRate, uint32_t dstRate, uint64_t& frameCount);
 
     bool m_initialized = false;
     std::atomic<bool> m_playing{false};
@@ -97,5 +99,6 @@ private:
     bool m_streamOpen = false;
     bool m_streamRunning = false;
     int m_defaultDeviceId = -1;
+    uint32_t m_deviceSampleRate = 0;
     std::mutex m_streamMutex;
 };
